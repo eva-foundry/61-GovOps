@@ -44,6 +44,7 @@ class ValueType(str, Enum):
     STRING = "string"
     BOOL = "bool"
     LIST = "list"
+    OBJECT = "object"  # arbitrary JSON-shaped mapping (e.g. SUPPORTED_LANGUAGES)
     ENUM = "enum"
     PROMPT = "prompt"
     FORMULA = "formula"

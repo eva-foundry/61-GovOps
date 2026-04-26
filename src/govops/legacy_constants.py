@@ -20,6 +20,8 @@ for these defaults.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import Any
 
 from govops.config import ConfigStore, register_legacy
@@ -119,22 +121,61 @@ register_legacy(
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 helper — resolve via the two-tier resolver with no substrate set.
-# At module load (seed time), the substrate ConfigStore is empty, so every
-# call falls through to LEGACY_CONSTANTS. After Phase 3 lands the YAML
-# loader, callers can switch to the populated singleton store transparently.
+# Phase 3 helper — substrate is populated from YAML at module import time.
+#
+# Path resolution: AIA_LAWCODE_PATH overrides the default. The default is
+# ``<repo-root>/lawcode/`` derived from this file's location (three levels
+# up from src/govops/legacy_constants.py).
+#
+# Once Phase 3.3 retires the register_legacy() calls above, the YAML files
+# under ``lawcode/`` become the single source of truth and this module
+# shrinks to just the loader bootstrap + resolve_param() helper.
 # ---------------------------------------------------------------------------
 
-_resolver = ConfigStore()  # empty; only the LEGACY tier participates
+_resolver = ConfigStore()
 
 
-def resolve_param(key: str) -> Any:
-    """Resolve a rule parameter via the Phase 2 backcompat path.
+def _default_lawcode_path() -> Path:
+    return Path(__file__).resolve().parent.parent.parent / "lawcode"
 
-    Returns the bare value (not a ``ResolutionResult``). Raises
-    ``ConfigKeyNotMigrated`` in strict mode if the key has no entry.
+
+_lawcode_path = Path(os.environ.get("AIA_LAWCODE_PATH") or _default_lawcode_path())
+if _lawcode_path.exists():
+    _resolver.load_from_yaml(_lawcode_path)
+
+
+_JURISDICTION_PREFIX_TO_ID = {
+    "ca": "ca-oas",
+    "br": "br-inss",
+    "es": "es-jub",
+    "fr": "fr-cnav",
+    "de": "de-drv",
+    "ua": "ua-pfu",
+    # "global" and "ui" map to the global scope (None / "global" — equivalent).
+}
+
+_RP_MISSING: Any = object()
+
+
+def resolve_param(key: str, default: Any = _RP_MISSING) -> Any:
+    """Resolve a parameter via the substrate first, then LEGACY_CONSTANTS.
+
+    Extracts the jurisdiction code from the first dotted segment of the key
+    (``ca.rule.age-65.min_age`` → ``ca-oas``) so the substrate query matches
+    YAML records scoped to the full jurisdiction id.
+
+    Returns the bare value (not a ``ResolutionResult``). With no default,
+    raises ``ConfigKeyNotMigrated`` in strict mode if neither tier holds the
+    key. With an explicit ``default``, returns it instead — useful for
+    optional lookups (e.g. translation fallbacks) that should never raise.
     """
-    return _resolver.resolve_value(key).value
+    prefix = key.split(".", 1)[0]
+    jurisdiction_id = _JURISDICTION_PREFIX_TO_ID.get(prefix)
+    if default is _RP_MISSING:
+        return _resolver.resolve_value(key, jurisdiction_id=jurisdiction_id).value
+    return _resolver.resolve_value(
+        key, jurisdiction_id=jurisdiction_id, default=default
+    ).value
 
 
 # ---------------------------------------------------------------------------
