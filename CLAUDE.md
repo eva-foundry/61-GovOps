@@ -17,28 +17,50 @@ Built on **FKTE** (Fractal Knowledge Transformation Engine):
 
 ## Current State
 
-Working demo — 6 jurisdictions (CA/BR/ES/FR/DE/UA), 6 languages (en/fr/pt/es/de/uk), **65 tests passing**.
+6 jurisdictions (CA/BR/ES/FR/DE/UA), 6 languages (en/fr/pt/es/de/uk), **98 backend tests passing**.
 
+**Backend (Python / FastAPI):**
 - Deterministic rule engine for pension eligibility (age, residency/contribution, legal status, evidence)
 - Full authority chain traceability from Constitution through to service decision
 - Human review workflow: approve, modify, reject, request info, escalate
 - Complete audit trail with statutory citations
 - AI-assisted rule encoding pipeline (legislative text → proposed rules → human review → commit)
+- **Phase 1 substrate**: ConfigValue + ConfigStore in `src/govops/config.py`, read-only API at `/api/config/values`, `/resolve`, `/versions`. Per-parameter granularity ([ADR-006](docs/design/ADRs/ADR-006-per-parameter-granularity.md)), in-memory storage ([ADR-007](docs/design/ADRs/ADR-007-in-memory-storage.md))
 - One-command demo: `govops-demo`
+
+**Frontend (React / TanStack Start, in `web/`):**
+- Lovable-authored artefact under `web/` per [ADR-005](docs/design/ADRs/ADR-005-lovable-repo-location.md)
+- Stack: Vite + React 19 + TanStack Start (SSR) + Tailwind v4 + shadcn/ui + react-intl (ICU MessageFormat) + lucide-react + react-hook-form/zod + CodeMirror + react-diff-viewer-continued
+- All Phase 6 surfaces shipped: shell, ConfigValue admin (search/timeline/diff/draft/approvals/prompts), cases, authority, encoder, admin
+- 6 locales × ~511 keys; ICU validation runs as `prebuild`
+- Ships against the live FastAPI; mock fallback for endpoints not yet in backend
 
 ## Running and Testing
 
+### Backend
 ```bash
 pip install -e ".[dev]"
 govops-demo                                    # http://127.0.0.1:8000
 govops-demo --reload                           # auto-reload for development
 govops-demo --port 9000                        # custom port
 
-pytest -q                                      # all 65 tests
+pytest -q                                      # all 98 tests
 pytest tests/test_engine.py -v                 # one file
 pytest tests/test_engine.py::test_name -v      # one test
 pytest -k "residency" -v                       # by keyword
 ```
+
+### Frontend (`web/`)
+```bash
+cd web
+npm install                                    # or bun install (lockfile present)
+npm run dev                                    # http://localhost:8080
+npm run build                                  # vite build (SSR + client)
+npm run check:i18n                             # ICU MessageFormat + key parity
+npm run lint                                   # eslint + prettier
+```
+
+The frontend SSR fetches from `VITE_API_BASE_URL` (default `http://127.0.0.1:8000`); set `VITE_USE_MOCK_API=true` to bypass the backend and use in-app mocks.
 
 CI runs on Python **3.10, 3.11, 3.12** (`.github/workflows/ci.yml`). No lint or typecheck gate is wired in CI; `mypy` is configured in `pyproject.toml` but not enforced.
 
@@ -46,6 +68,7 @@ Other workflows: `codeql.yml` (code scanning), `gitleaks.yml` (secret scanning, 
 
 ## Key Paths
 
+### Backend
 | Surface | Path |
 | --- | --- |
 | Domain model | `src/govops/models.py` |
@@ -56,19 +79,45 @@ Other workflows: `codeql.yml` (code scanning), `gitleaks.yml` (secret scanning, 
 | Rule encoding pipeline | `src/govops/encoder.py` |
 | Pre-loaded encoding demo | `src/govops/encoding_example.py` |
 | In-memory store | `src/govops/store.py` |
+| ConfigValue substrate (Phase 1) | `src/govops/config.py` |
 | API (JSON + HTML) | `src/govops/api.py` |
 | CLI entry point | `src/govops/cli.py` |
-| Templates | `src/govops/templates/` (about, cases, authority, audit, admin, encode, mvp) |
+| Jinja templates (legacy, replaced by `web/` from Phase 6) | `src/govops/templates/` |
 | Engine tests | `tests/test_engine.py` (14) |
 | API tests | `tests/test_api.py` (36) |
 | Encoder tests | `tests/test_encoder.py` (15) |
+| ConfigStore tests | `tests/test_config.py` (18) |
+| Config API tests | `tests/test_api_config.py` (15) |
+
+### Frontend (`web/`)
+| Surface | Path |
+| --- | --- |
+| Routes (TanStack flat dot) | `web/src/routes/` |
+| GovOps components | `web/src/components/govops/` |
+| shadcn/ui primitives | `web/src/components/ui/` |
+| Design tokens (CSS vars) | `web/src/styles.css` |
+| API client | `web/src/lib/api.ts` |
+| Mock fallbacks | `web/src/lib/api.mock.ts`, `mock-*.ts` |
+| TypeScript types | `web/src/lib/types.ts` |
+| ICU translations | `web/src/messages/{en,fr,pt-BR,es-MX,de,uk}.json` |
+| Prebuild ICU validator | `web/scripts/check-i18n-icu.mjs` |
+| Prebuild key-parity validator | `web/scripts/check-i18n-keys.mjs` |
+| Brand assets | `web/public/govops-{wordmark,symbol}.png`, `web/brand/` |
+
+### Cross-cutting
+| Surface | Path |
+| --- | --- |
+| Lovable handoff protocol | `docs/govops-handoff-protocol.md` |
+| Lovable specs | `docs/govops-002-shell.md` … `docs/govops-013-polish-fixes.md` |
+| Brand tokens (canonical) | `docs/govops-design-tokens.json` |
 | Compliance | `docs/design/COMPLIANCE.md` |
 | MVP spec | `docs/design/IDEA-GovOps-v1.0-MVP.md` |
 | Architecture / ADRs | `docs/design/architecture/`, `docs/design/ADRs/` |
 | Ecosystem docs | `docs/ecosystem/` |
 | GitHub Pages site | `docs/index.html` |
 | Copilot rules | `.github/copilot-instructions.md` |
-| OpenAPI snapshot (frozen Phase 0) | `docs/api/openapi-v0.2.0.json` |
+| OpenAPI snapshot (Phase 0, frozen) | `docs/api/openapi-v0.2.0.json` |
+| OpenAPI snapshot (Phase 1, draft) | `docs/api/openapi-v0.3.0-draft.json` |
 
 ## Design Rules
 
