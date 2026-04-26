@@ -114,6 +114,57 @@ def test_phase6_exit_line_admin_changes_min_age(client):
     assert post_resp.json()["value"] == 67
 
 
+def test_phase6_status_filter_on_list_endpoint(client):
+    """Regression: GET /api/config/values must honor ?status=draft|pending|approved.
+
+    Surfaced 2026-04-26 by the live walkthrough — the frontend's approvals queue
+    calls `?status=draft` + `?status=pending` (web/src/lib/api.ts), but the
+    endpoint was ignoring the param and returning every record. Without this
+    filter the queue shows 325 rows instead of the actual N drafts.
+    """
+    # Fixture seeded one approved record. No drafts yet.
+    r = client.get("/api/config/values", params={"status": "draft"})
+    assert r.status_code == 200
+    assert r.json()["count"] == 0
+
+    # Create a draft, count goes to 1.
+    create = client.post(
+        "/api/config/values",
+        json={
+            "domain": "rule",
+            "key": "ca-oas.rule.test-status-filter",
+            "jurisdiction_id": "ca-oas",
+            "value": 1,
+            "value_type": "number",
+            "effective_from": "2027-01-01T00:00:00+00:00",
+            "effective_to": None,
+            "citation": None,
+            "author": "alice",
+            "rationale": "regression test",
+            "supersedes": None,
+            "language": None,
+        },
+    )
+    new_id = create.json()["id"]
+
+    r = client.get("/api/config/values", params={"status": "draft"})
+    assert r.json()["count"] == 1
+
+    # Approving moves it out of draft.
+    client.post(
+        f"/api/config/values/{new_id}/approve",
+        json={"approved_by": "bob", "comment": ""},
+    )
+    r = client.get("/api/config/values", params={"status": "draft"})
+    assert r.json()["count"] == 0
+    r = client.get("/api/config/values", params={"status": "approved"})
+    assert r.json()["count"] >= 1  # at least the approved record + fixture seed
+
+    # Invalid status is a 400, not silently ignored.
+    bad = client.get("/api/config/values", params={"status": "bogus"})
+    assert bad.status_code == 400
+
+
 def test_phase6_audit_trail_is_persisted(client):
     """Each approval-flow event is recorded in the audit table."""
     create_resp = client.post(
