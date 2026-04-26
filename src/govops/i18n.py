@@ -21,16 +21,17 @@ DEFAULT_LANGUAGE = resolve_param("global.config.default_language")
 
 
 def t(key: str, lang: str = DEFAULT_LANGUAGE) -> str:
-    """Get a translated string via the LEGACY_CONSTANTS registry.
+    """Get a translated string via the substrate / LEGACY_CONSTANTS.
 
     Falls back to English then to the key itself when the locale is missing.
+    Uses the optional-default form of resolve_param so unknown keys return
+    None instead of raising under AIA_CONFIG_STRICT=1.
     """
-    full = f"ui.label.{key}.{lang}"
-    value = resolve_param(full)
+    value = resolve_param(f"ui.label.{key}.{lang}", default=None)
     if value is not None:
         return value
     if lang != "en":
-        en_value = resolve_param(f"ui.label.{key}.en")
+        en_value = resolve_param(f"ui.label.{key}.en", default=None)
         if en_value is not None:
             return en_value
     return key

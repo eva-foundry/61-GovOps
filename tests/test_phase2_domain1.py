@@ -224,3 +224,55 @@ def test_t_returns_key_for_unknown_key():
     from govops.i18n import t
 
     assert t("totally.unknown.key", "en") == "totally.unknown.key"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3.2 — substrate sourcing
+#
+# After lawcode/ YAML loading, every resolve_param() should hit the
+# SUBSTRATE tier instead of LEGACY. This is the Phase 2 -> 3 transition
+# witness: the registry isn't being read for migrated keys anymore.
+# ---------------------------------------------------------------------------
+
+
+def test_substrate_serves_seeded_rule_keys():
+    """Every key the engine consumes resolves from substrate, not LEGACY."""
+    from govops.config import ResolutionSource
+    from govops.legacy_constants import _resolver
+
+    seen_substrate = 0
+    for pack in JURISDICTION_REGISTRY.values():
+        for rule in pack.rules:
+            jur, slug = RULE_KEY_MAP[rule.id]
+            for param_name in rule.parameters.keys():
+                key = f"{jur}.rule.{slug}.{param_name}"
+                from govops.legacy_constants import _JURISDICTION_PREFIX_TO_ID
+
+                jurisdiction_id = _JURISDICTION_PREFIX_TO_ID.get(jur)
+                result = _resolver.resolve_value(key, jurisdiction_id=jurisdiction_id)
+                assert result.source == ResolutionSource.SUBSTRATE, (
+                    f"{key} should resolve from substrate, got {result.source}"
+                )
+                seen_substrate += 1
+    assert seen_substrate >= 30, f"Coverage suspiciously low: {seen_substrate}"
+
+
+def test_substrate_serves_engine_threshold_keys():
+    """engine.threshold keys come from substrate, not LEGACY."""
+    from govops.config import ResolutionSource
+    from govops.legacy_constants import _resolver
+
+    for key in ENGINE_THRESHOLD_KEYS:
+        result = _resolver.resolve_value(key)
+        assert result.source == ResolutionSource.SUBSTRATE, (
+            f"{key} should resolve from substrate, got {result.source}"
+        )
+
+
+def test_substrate_serves_global_config_keys():
+    from govops.config import ResolutionSource
+    from govops.legacy_constants import _resolver
+
+    for key in ("global.config.default_language", "global.config.supported_languages"):
+        result = _resolver.resolve_value(key)
+        assert result.source == ResolutionSource.SUBSTRATE

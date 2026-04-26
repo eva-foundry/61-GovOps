@@ -20,3 +20,9 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: python scripts/check_no_hardcoded_constants.py
       - run: pytest -v
+      # Phase 3 strict-mode gate (per ADR-004 §3): every resolve must hit the
+      # substrate (YAML) — never fall through to LEGACY_CONSTANTS.
+      - name: Strict-mode pytest (no LEGACY fallthrough)
+        env:
+          AIA_CONFIG_STRICT: "1"
+        run: pytest -v
