@@ -25,8 +25,15 @@ wheels/
 *.egg
 
 # IDEs
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
+
+# Claude Code: share team settings; ignore per-dev overrides and local state
+.claude/settings.local.json
+.claude/projects/
+.claude/sessions/
 *.swp
 *.swo
 *~

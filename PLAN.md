@@ -296,7 +296,7 @@ Tests must stay green at every phase exit. CI matrix stays at Python 3.10/3.11/3
 - Per-phase tags: `lawcode-v2-phase-<N>-complete` after each phase exit.
 - Every ADR is a separate commit in `docs/design/ADRs/` referencing the gate or decision it captures.
 - Commit message convention: `phase-<N>: <imperative>` (e.g. `phase-1: add ConfigStore.resolve()`).
-- Conventional Commits not enforced in CI yet; revisit at Phase 5.
+- Conventional Commits adopted from Phase 0 (`type(scope): subject` — types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `phase-N`). CI enforcement revisit at Phase 5.
 
 ---
 
