@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=../../../schema/lawcode-v1.0.json
+# ca/config/rules.yaml — generated from legacy_constants.py at Phase 3.2 cutover.
+# Schema: defaults + values list per ADR-003 §Mitigations.
+
+defaults:
+  domain: rule
+  jurisdiction_id: ca-oas
+  effective_from: '1900-01-01'
+values:
+- key: ca.rule.age-65.min_age
+  value: 65
+  value_type: number
+- key: ca.rule.evidence-age.required_types
+  value:
+  - birth_certificate
+  value_type: list
+- key: ca.rule.legal-status.accepted_statuses
+  value:
+  - citizen
+  - permanent_resident
+  value_type: list
+- key: ca.rule.residency-10.home_countries
+  value:
+  - CA
+  - CANADA
+  - CAN
+  value_type: list
+- key: ca.rule.residency-10.min_years
+  value: 10
+  value_type: number
+- key: ca.rule.residency-pension-type.full_years
+  value: 40
+  value_type: number
+- key: ca.rule.residency-pension-type.min_years
+  value: 10
+  value_type: number

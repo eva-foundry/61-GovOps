@@ -1,6 +1,6 @@
 # GovOps - Policy-Driven Service Delivery Machine
 
-> **Disclaimer**: This is an independent prototype built as a personal, open-source project. It is **not affiliated with, endorsed by, or representing the Government of Canada, Service Canada, ESDC, or any government entity**. Legislative text used in the demo (including the Old Age Security Act) is publicly available law interpreted by the author for illustrative purposes only — it is **not authoritative operational guidance** and should not be relied upon for actual eligibility determinations.
+> **Disclaimer**: This is an independent prototype built as a personal, open-source project. It is **not affiliated with, endorsed by, or representing any government, department, or public agency**. Legislative text used in the demo (including the Old Age Security Act) is publicly available law interpreted by the author for illustrative purposes only — it is **not authoritative operational guidance** and should not be relied upon for actual eligibility determinations.
 
 **Law -> Policy -> Service -> Decision**
 
@@ -14,7 +14,7 @@ This is an open public-good contribution for the global public sector: something
 
 ```bash
 # Clone and install
-git clone https://github.com/eva-foundry/61-GovOps.git
+git clone https://github.com/your-org/61-GovOps.git
 cd 61-GovOps
 pip install -e ".[dev]"
 
@@ -211,16 +211,27 @@ src/govops/
   api.py               # FastAPI (JSON API + HTML UI)
   cli.py               # CLI entry point
   templates/           # Jinja2 templates (about, cases, authority, audit, admin, encode, mvp)
+  config.py            # ConfigValue substrate (Law-as-Code v2.0)
+lawcode/               # Effective-dated ConfigValue records (YAML, schema-validated)
+  global/              # Cross-jurisdictional values (engine thresholds, UI labels, prompts)
+  {ca,br,es,fr,de,ua}/config/  # Per-jurisdiction rule parameters
+schema/
+  configvalue-v1.0.json  # JSON Schema for a single ConfigValue record
+  lawcode-v1.0.json      # JSON Schema for the lawcode/*.yaml file shape
 tests/
   test_engine.py       # Rule engine tests
   test_api.py          # API, multi-jurisdiction, and HTML tests
   test_encoder.py      # Encoding pipeline tests
 docs/
-  index.html           # GitHub Pages landing page (eva-foundry.github.io/61-GovOps)
+  index.html           # GitHub Pages landing page (your-org.github.io/61-GovOps)
   screenshots/         # Static HTML snapshots of every screen
   ecosystem/           # Implementation guide, training, certification, RFP, use cases, partner program
   design/              # MVP spec, CDD, architecture baselines, ADRs, compliance
 ```
+
+### Law-as-Code v2.0
+
+Every business value (thresholds, accepted statuses, UI labels, LLM prompts) lives as a dated `ConfigValue` record under [lawcode/](lawcode/). The on-disk shape is locked by [schema/lawcode-v1.0.json](schema/lawcode-v1.0.json); each merged record satisfies [schema/configvalue-v1.0.json](schema/configvalue-v1.0.json). CI runs `python scripts/validate_lawcode.py` on every push, so a malformed YAML breaks the build before merge. Track the live execution plan in [PLAN.md](PLAN.md).
 
 ---
 

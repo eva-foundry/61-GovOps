@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from govops.legacy_constants import resolve_param  # populates LEGACY_CONSTANTS
 from govops.models import (
     AuditEntry,
     CaseBundle,
@@ -47,9 +48,14 @@ def _home_residency_years_after_18(
     dob: date,
     residency_periods: list[ResidencyPeriod],
     ref_date: date,
-    home_countries: tuple[str, ...] = ("CA", "CANADA", "CAN"),
+    home_countries: tuple[str, ...],
 ) -> float:
-    """Total years of home-country residency/contribution after the applicant turned 18."""
+    """Total years of home-country residency/contribution after the applicant turned 18.
+
+    Callers must pass ``home_countries`` explicitly (post-Phase-2 there's no
+    default to fall back on; jurisdictional values come from the registry via
+    ``OASEngine._get_home_countries()``).
+    """
     age_18_date = date(dob.year + 18, dob.month, dob.day)
     total_days = 0
     for period in residency_periods:
@@ -89,14 +95,14 @@ class OASEngine:
         flags: list[str] = []
 
         # --- Evidence sufficiency pre-check ---
+        dob_types = set(resolve_param("global.engine.evidence.dob_types"))
+        residency_types = set(resolve_param("global.engine.evidence.residency_types"))
         has_dob_evidence = any(
-            e.evidence_type in ("birth_certificate", "passport", "id_card")
-            and e.provided
+            e.evidence_type in dob_types and e.provided
             for e in case.evidence_items
         )
         has_residency_evidence = any(
-            e.evidence_type in ("tax_record", "residency_declaration", "passport_stamps", "utility_bill")
-            and e.provided
+            e.evidence_type in residency_types and e.provided
             for e in case.evidence_items
         )
 
@@ -176,13 +182,19 @@ class OASEngine:
         )
 
     def _get_home_countries(self) -> tuple[str, ...]:
-        """Derive home countries from the jurisdiction in the current rule set."""
+        """Derive home countries from the jurisdiction in the current rule set.
+
+        After Phase 2 Domain 1, every residency rule carries home_countries via
+        the legacy_constants registry, so the loop below always finds a match
+        in any jurisdiction's seeded rule set. Returns an empty tuple only
+        when the engine is constructed with no residency rules — a degenerate
+        state that the residency evaluators handle as missing evidence.
+        """
         for rule in self.rules.values():
             hc = rule.parameters.get("home_countries")
             if hc:
                 return tuple(c.upper() for c in hc)
-        # Fallback: check all jurisdiction IDs in rule source docs
-        return ("CA", "CANADA", "CAN")
+        return ()
 
     def _eval_residency_minimum(self, rule: LegalRule, case: CaseBundle) -> RuleEvaluation:
         min_years = rule.parameters.get("min_years", 10)

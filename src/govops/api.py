@@ -6,8 +6,10 @@ Supports multiple jurisdictions and languages.
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from starlette.datastructures import FormData, UploadFile as StarletteUploadFile
@@ -16,6 +18,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
+from datetime import datetime, timezone
+
+from govops.config import (
+    ApprovalStatus,
+    ConfigStore,
+    ConfigValue,
+    ValueType,
+)
 from govops.encoding_example import seed_encoding_example
 from govops.encoder import (
     EncodingStore,
@@ -42,6 +52,12 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 store = DemoStore()
 encoding_store = EncodingStore()
+# Per ADR-010: persistent SQLite when GOVOPS_DB_PATH is set, in-memory otherwise.
+# Tests don't set the env var → fresh in-memory DB per process. The govops-demo
+# CLI sets it to var/govops.db so runtime edits survive restarts.
+config_store = ConfigStore(db_path=os.environ.get("GOVOPS_DB_PATH"))
+
+LAWCODE_DIR = Path(__file__).resolve().parent.parent.parent / "lawcode"
 
 DEFAULT_JURISDICTION = "ca"
 
@@ -60,10 +76,86 @@ def _seed_jurisdiction(jur_code: str):
     )
 
 
+def _seed_demo_drafts():
+    """Seed the approvals queue with representative drafts so the admin UI
+    has something to show on first load. Triggered by GOVOPS_SEED_DEMO=1.
+
+    Idempotent: each demo draft has a unique key prefix
+    (`demo.draft.*`) so re-runs don't create duplicates.
+    """
+    demo_drafts = [
+        {
+            "key": "demo.draft.ca-oas.age-67-amendment",
+            "jurisdiction_id": "ca-oas",
+            "value": 67,
+            "value_type": ValueType.NUMBER,
+            "effective_from": datetime(2027, 1, 1, tzinfo=timezone.utc),
+            "citation": "Hypothetical 2027 OAS amendment (demo data)",
+            "author": "demo-author",
+            "rationale": "Sample policy proposal: raise OAS minimum age to 67 effective 2027-01-01.",
+            "status": ApprovalStatus.DRAFT,
+        },
+        {
+            "key": "demo.draft.fr-cnav.indexation-2026",
+            "jurisdiction_id": "fr-cnav",
+            "value": 1.024,
+            "value_type": ValueType.NUMBER,
+            "effective_from": datetime(2026, 7, 1, tzinfo=timezone.utc),
+            "citation": "Hypothetical CNAV revaluation 2026 (demo data)",
+            "author": "demo-author",
+            "rationale": "Sample annual index adjustment for CNAV pension benefits.",
+            "status": ApprovalStatus.PENDING,
+        },
+        {
+            "key": "demo.draft.de-drv.entgeltpunkt-rejected",
+            "jurisdiction_id": "de-drv",
+            "value": 36.50,
+            "value_type": ValueType.NUMBER,
+            "effective_from": datetime(2026, 7, 1, tzinfo=timezone.utc),
+            "citation": "Hypothetical DRV Entgeltpunkt update (demo data)",
+            "author": "demo-author",
+            "rationale": "Sample entgeltpunkt revision; rejected as out of scope for current track.",
+            "status": ApprovalStatus.REJECTED,
+        },
+    ]
+    for draft in demo_drafts:
+        existing = config_store.list_versions(draft["key"], jurisdiction_id=draft["jurisdiction_id"])
+        if existing:
+            continue
+        cv = ConfigValue(
+            domain="rule",
+            key=draft["key"],
+            jurisdiction_id=draft["jurisdiction_id"],
+            value=draft["value"],
+            value_type=draft["value_type"],
+            effective_from=draft["effective_from"],
+            citation=draft["citation"],
+            author=draft["author"],
+            rationale=draft["rationale"],
+            status=draft["status"],
+        )
+        config_store.put(cv)
+        config_store.record_audit(
+            config_value_id=cv.id,
+            event="draft_created",
+            actor=draft["author"],
+            comment=draft["rationale"],
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     _seed_jurisdiction(DEFAULT_JURISDICTION)
     seed_encoding_example(encoding_store)
+    # Hydrate the substrate from lawcode/ if it's empty (per ADR-010).
+    # Skip when pre-populated (test fixtures rely on this); idempotent on
+    # natural key, so a partially-seeded store is also tolerated.
+    if len(config_store) == 0 and LAWCODE_DIR.exists():
+        config_store.load_from_yaml(LAWCODE_DIR)
+    # Demo seed: enterprise-grade demo experience requires a non-empty
+    # approvals queue on first load. GOVOPS_SEED_DEMO=1 turns it on.
+    if os.environ.get("GOVOPS_SEED_DEMO") == "1":
+        _seed_demo_drafts()
     yield
 
 
@@ -228,6 +320,246 @@ def get_audit(case_id: str):
     if not pkg:
         raise HTTPException(404, f"Case {case_id} not found")
     return pkg
+
+
+# ---------------------------------------------------------------------------
+# ConfigValue API (Law-as-Code v2.0 Phase 1)
+# Read-only endpoints; write/approve land in Phase 6.
+# ---------------------------------------------------------------------------
+
+@app.get("/api/config/values")
+def list_config_values(
+    domain: str | None = None,
+    key_prefix: str | None = None,
+    jurisdiction_id: str | None = None,
+    language: str | None = None,
+    status: str | None = None,
+):
+    """List ConfigValue records, optionally filtered."""
+    status_enum: ApprovalStatus | None = None
+    if status is not None:
+        try:
+            status_enum = ApprovalStatus(status)
+        except ValueError as exc:
+            raise HTTPException(400, f"Invalid status: {status}") from exc
+    rows = config_store.list(
+        domain=domain,
+        key_prefix=key_prefix,
+        jurisdiction_id=jurisdiction_id,
+        language=language,
+        status=status_enum,
+    )
+    return {"values": rows, "count": len(rows)}
+
+
+@app.get("/api/config/values/{value_id}")
+def get_config_value(value_id: str):
+    """Fetch a single ConfigValue by id."""
+    cv = config_store.get(value_id)
+    if cv is None:
+        raise HTTPException(404, f"ConfigValue {value_id} not found")
+    return cv
+
+
+@app.get("/api/config/resolve")
+def resolve_config_value(
+    key: str,
+    evaluation_date: str | None = None,
+    jurisdiction_id: str | None = None,
+    language: str | None = None,
+):
+    """Resolve the ConfigValue in effect for `key` at `evaluation_date`.
+
+    `evaluation_date` must be ISO-8601 with timezone (e.g. `2027-01-01T00:00:00+00:00`);
+    defaults to now (UTC) if omitted.
+
+    Returns the matching `ConfigValue` directly, or JSON `null` if no record is in
+    effect. Clients distinguish "no current value" from a fetch error by checking
+    for `null` rather than relying on a 404 status.
+    """
+    if evaluation_date is None:
+        when = datetime.now(timezone.utc)
+    else:
+        try:
+            when = datetime.fromisoformat(evaluation_date)
+        except ValueError as exc:
+            raise HTTPException(
+                400,
+                f"Invalid evaluation_date: {exc}. Expected ISO-8601 with timezone.",
+            ) from exc
+        if when.tzinfo is None:
+            raise HTTPException(
+                400,
+                "evaluation_date must include a timezone (e.g. ...+00:00).",
+            )
+    return config_store.resolve(
+        key=key,
+        evaluation_date=when,
+        jurisdiction_id=jurisdiction_id,
+        language=language,
+    )
+
+
+@app.get("/api/config/versions")
+def list_config_versions(
+    key: str,
+    jurisdiction_id: str | None = None,
+    language: str | None = None,
+):
+    """Return the full version history for a key, oldest-first."""
+    versions = config_store.list_versions(
+        key=key,
+        jurisdiction_id=jurisdiction_id,
+        language=language,
+    )
+    return {"key": key, "versions": versions, "count": len(versions)}
+
+
+# ---------------------------------------------------------------------------
+# ConfigValue write endpoints (Phase 6 — admin UI backend)
+# ---------------------------------------------------------------------------
+
+
+class CreateConfigValueRequest(BaseModel):
+    domain: str
+    key: str
+    jurisdiction_id: str | None = None
+    value: Any
+    value_type: ValueType
+    effective_from: str  # ISO-8601 with tz
+    effective_to: str | None = None
+    citation: str | None = None
+    author: str
+    rationale: str = ""
+    supersedes: str | None = None
+    language: str | None = None
+
+
+class ApproveRequest(BaseModel):
+    approved_by: str
+    comment: str = ""
+
+
+class ReviewRequest(BaseModel):
+    reviewer: str
+    comment: str = ""
+
+
+def _parse_iso(value: str | None, field: str) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(400, f"Invalid {field}: {exc}. Expected ISO-8601 with timezone.") from exc
+    if dt.tzinfo is None:
+        raise HTTPException(400, f"{field} must include a timezone (e.g. ...+00:00).")
+    return dt
+
+
+@app.post("/api/config/values", status_code=201)
+def create_config_value(body: CreateConfigValueRequest):
+    """Create a new ConfigValue draft. Status starts at DRAFT; an /approve
+    call is required before the record participates in resolution."""
+    eff_from = _parse_iso(body.effective_from, "effective_from")
+    eff_to = _parse_iso(body.effective_to, "effective_to")
+    if eff_from is None:
+        raise HTTPException(400, "effective_from is required")
+    cv = ConfigValue(
+        domain=body.domain,
+        key=body.key,
+        jurisdiction_id=body.jurisdiction_id,
+        value=body.value,
+        value_type=body.value_type,
+        effective_from=eff_from,
+        effective_to=eff_to,
+        citation=body.citation,
+        author=body.author,
+        approved_by=None,
+        rationale=body.rationale,
+        supersedes=body.supersedes,
+        status=ApprovalStatus.DRAFT,
+        language=body.language,
+    )
+    config_store.put(cv)
+    config_store.record_audit(
+        config_value_id=cv.id,
+        event="draft_created",
+        actor=body.author,
+        comment=body.rationale,
+    )
+    return cv
+
+
+@app.post("/api/config/values/{value_id}/approve")
+def approve_config_value(value_id: str, body: ApproveRequest):
+    """Approve a draft/pending ConfigValue. Sets status=APPROVED and
+    approved_by; the record now participates in resolution."""
+    cv = config_store.get(value_id)
+    if cv is None:
+        raise HTTPException(404, f"ConfigValue {value_id} not found")
+    if cv.status == ApprovalStatus.APPROVED:
+        raise HTTPException(409, f"ConfigValue {value_id} is already approved")
+    if cv.status == ApprovalStatus.REJECTED:
+        raise HTTPException(409, f"ConfigValue {value_id} was rejected; cannot approve")
+    if body.approved_by == cv.author:
+        # ADR-008 dual-approval: prompts require approver != author. Apply the
+        # constraint to all domains as a defensive default; the admin UI can
+        # surface a specific message.
+        if cv.value_type == ValueType.PROMPT:
+            raise HTTPException(
+                403,
+                "Per ADR-008, prompt approvals require approved_by != author (dual approval).",
+            )
+    cv.status = ApprovalStatus.APPROVED
+    cv.approved_by = body.approved_by
+    config_store.put(cv)
+    config_store.record_audit(
+        config_value_id=value_id,
+        event="approved",
+        actor=body.approved_by,
+        comment=body.comment,
+    )
+    return cv
+
+
+@app.post("/api/config/values/{value_id}/request-changes")
+def request_changes_config_value(value_id: str, body: ReviewRequest):
+    """Send a pending value back to draft for further author edits."""
+    cv = config_store.get(value_id)
+    if cv is None:
+        raise HTTPException(404, f"ConfigValue {value_id} not found")
+    if cv.status == ApprovalStatus.APPROVED:
+        raise HTTPException(409, f"ConfigValue {value_id} already approved")
+    cv.status = ApprovalStatus.DRAFT
+    config_store.put(cv)
+    config_store.record_audit(
+        config_value_id=value_id,
+        event="request_changes",
+        actor=body.reviewer,
+        comment=body.comment,
+    )
+    return cv
+
+
+@app.post("/api/config/values/{value_id}/reject")
+def reject_config_value(value_id: str, body: ReviewRequest):
+    """Reject a draft/pending ConfigValue. Terminal state — record is kept
+    for audit but never participates in resolution."""
+    cv = config_store.get(value_id)
+    if cv is None:
+        raise HTTPException(404, f"ConfigValue {value_id} not found")
+    if cv.status == ApprovalStatus.APPROVED:
+        raise HTTPException(409, f"ConfigValue {value_id} already approved; cannot reject")
+    cv.status = ApprovalStatus.REJECTED
+    config_store.put(cv)
+    config_store.record_audit(
+        config_value_id=value_id,
+        event="rejected",
+        actor=body.reviewer,
+        comment=body.comment,
+    )
+    return cv
 
 
 # ---------------------------------------------------------------------------
@@ -443,12 +775,18 @@ async def ui_encode_ingest(request: Request):
 
     if method == "llm" and api_key:
         try:
-            proposals, prompt, raw_response = await extract_rules_with_llm(
-                batch, api_key=api_key,
-            )
+            (
+                proposals,
+                prompt,
+                raw_response,
+                user_prompt_key,
+                system_prompt_key,
+            ) = await extract_rules_with_llm(batch, api_key=api_key)
             encoding_store.add_proposals(
                 batch.id, proposals, method="llm:claude",
                 prompt=prompt, raw_response=raw_response,
+                prompt_key=user_prompt_key,
+                system_prompt_key=system_prompt_key,
             )
         except Exception as e:
             # Fallback to manual on error

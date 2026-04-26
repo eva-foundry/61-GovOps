@@ -8,25 +8,32 @@ env/
 venv/
 .venv/
 ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
 # IDEs
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
+
+# Claude Code: share team settings; ignore per-dev overrides and local state
+.claude/settings.local.json
+.claude/projects/
+.claude/sessions/
 *.swp
 *.swo
 *~
@@ -53,6 +60,13 @@ secrets.yaml
 .coverage
 htmlcov/
 *.cover
+
+# Playwright (web/)
+web/test-results/
+web/playwright-report/
+web/blob-report/
+web/playwright/.cache/
+web/.last-run.json
 
 # Data Model (temporary local data)
 data/local/*.db
