@@ -68,7 +68,9 @@ class EncodingBatch(BaseModel):
     input_sections: list[LegalSection] = []
     proposals: list[RuleProposal] = []
     extraction_method: str = ""  # "llm:claude", "llm:openai", "manual"
-    extraction_prompt: str = ""  # The actual prompt used
+    extraction_prompt: str = ""  # The user-prompt text actually sent
+    extraction_prompt_key: str = ""  # ConfigValue key (e.g. global.prompt.encoder.extraction_user_template)
+    extraction_system_prompt_key: str = ""  # ConfigValue key for the system prompt
     raw_llm_response: str = ""  # Full LLM response for auditability
 
 
@@ -82,44 +84,21 @@ class EncodingAuditEntry(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Extraction prompt
+# Extraction prompts (Phase 4 / ADR-008)
 # ---------------------------------------------------------------------------
+# Source of truth: lawcode/global/prompts.yaml. Resolved at module import via
+# the substrate; per ADR-008, edits to those records require dual approval
+# (domain expert + maintainer). Module-level constants stay for backwards
+# compat with any external caller that imported them, but they're snapshots
+# of the current registry value.
 
-EXTRACTION_SYSTEM_PROMPT = """You are a legal rule extraction engine for GovOps.
+from govops.legacy_constants import resolve_param
 
-Your task: given a section of legislation, extract every testable condition as a structured rule.
+EXTRACTION_SYSTEM_PROMPT_KEY = "global.prompt.encoder.extraction_system"
+EXTRACTION_USER_PROMPT_TEMPLATE_KEY = "global.prompt.encoder.extraction_user_template"
 
-For each rule you extract, provide:
-1. rule_type: one of "age_threshold", "residency_minimum", "residency_partial", "legal_status", "evidence_required", "exclusion"
-2. description: what the rule says in plain language (in the original language of the legislation)
-3. formal_expression: a logical expression (e.g., "age >= 65")
-4. citation: exact section reference
-5. parameters: key-value pairs that the engine uses (e.g., {"min_age": 65})
-
-Rules for extraction:
-- Extract EVERY testable condition, including exceptions and transitional provisions
-- Each rule must cite the EXACT section/article/paragraph it comes from
-- If a provision has different thresholds for different groups (e.g., men/women, birth year cohorts), create SEPARATE rules for each
-- If a provision references another article, note the cross-reference
-- Do NOT invent conditions not present in the text
-- Do NOT merge multiple conditions into one rule
-- Mark uncertain extractions with a confidence note
-
-Output format: JSON array of objects with fields: rule_type, description, formal_expression, citation, parameters, source_text (the exact excerpt), notes (any uncertainty or cross-references)."""
-
-
-EXTRACTION_USER_PROMPT_TEMPLATE = """Extract all testable legal rules from the following legislative text.
-
-Document: {document_title}
-Citation: {document_citation}
-Jurisdiction: {jurisdiction_name}
-
----
-LEGISLATIVE TEXT:
-{text}
----
-
-Return a JSON array of extracted rules. Every rule must trace to a specific section of the text above."""
+EXTRACTION_SYSTEM_PROMPT = resolve_param(EXTRACTION_SYSTEM_PROMPT_KEY)
+EXTRACTION_USER_PROMPT_TEMPLATE = resolve_param(EXTRACTION_USER_PROMPT_TEMPLATE_KEY)
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +137,8 @@ class EncodingStore:
         method: str,
         prompt: str = "",
         raw_response: str = "",
+        prompt_key: str = "",
+        system_prompt_key: str = "",
     ):
         batch = self.batches.get(batch_id)
         if not batch:
@@ -167,9 +148,16 @@ class EncodingStore:
         batch.proposals.extend(proposals)
         batch.extraction_method = method
         batch.extraction_prompt = prompt
+        batch.extraction_prompt_key = prompt_key
+        batch.extraction_system_prompt_key = system_prompt_key
         batch.raw_llm_response = raw_response
+        log_data: dict = {"count": len(proposals)}
+        if prompt_key:
+            log_data["prompt_key"] = prompt_key
+        if system_prompt_key:
+            log_data["system_prompt_key"] = system_prompt_key
         self._log(batch_id, "extraction_complete", f"method:{method}",
-                  f"{len(proposals)} rules proposed", {"count": len(proposals)})
+                  f"{len(proposals)} rules proposed", log_data)
 
     def review_proposal(
         self,
@@ -279,14 +267,22 @@ async def extract_rules_with_llm(
     api_key: str,
     model: str = "claude-sonnet-4-20250514",
     base_url: str = "https://api.anthropic.com",
-) -> tuple[list[RuleProposal], str, str]:
+) -> tuple[list[RuleProposal], str, str, str, str]:
     """Call an LLM to extract rules from legislative text.
 
-    Returns (proposals, prompt_used, raw_response).
+    Returns (proposals, user_prompt_used, raw_response, user_prompt_key,
+    system_prompt_key) — the keys identify which substrate ConfigValues
+    sourced each prompt, so the audit trail can pin reproducibility.
     """
     import httpx
 
-    prompt = EXTRACTION_USER_PROMPT_TEMPLATE.format(
+    # Resolve fresh from the substrate so any post-startup admin write is
+    # picked up on the next batch (the in-memory store reseeds on restart;
+    # within one process, calls return the current snapshot).
+    user_template = resolve_param(EXTRACTION_USER_PROMPT_TEMPLATE_KEY)
+    system_prompt = resolve_param(EXTRACTION_SYSTEM_PROMPT_KEY)
+
+    prompt = user_template.format(
         document_title=batch.document_title,
         document_citation=batch.document_citation,
         jurisdiction_name=batch.jurisdiction_id,
@@ -304,7 +300,7 @@ async def extract_rules_with_llm(
             json={
                 "model": model,
                 "max_tokens": 4096,
-                "system": EXTRACTION_SYSTEM_PROMPT,
+                "system": system_prompt,
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
@@ -313,7 +309,13 @@ async def extract_rules_with_llm(
 
     raw_response = data.get("content", [{}])[0].get("text", "")
     proposals = parse_llm_response(raw_response, batch)
-    return proposals, prompt, raw_response
+    return (
+        proposals,
+        prompt,
+        raw_response,
+        EXTRACTION_USER_PROMPT_TEMPLATE_KEY,
+        EXTRACTION_SYSTEM_PROMPT_KEY,
+    )
 
 
 def extract_rules_manual(batch: EncodingBatch) -> list[RuleProposal]:
