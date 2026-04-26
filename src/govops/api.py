@@ -532,12 +532,18 @@ async def ui_encode_ingest(request: Request):
 
     if method == "llm" and api_key:
         try:
-            proposals, prompt, raw_response = await extract_rules_with_llm(
-                batch, api_key=api_key,
-            )
+            (
+                proposals,
+                prompt,
+                raw_response,
+                user_prompt_key,
+                system_prompt_key,
+            ) = await extract_rules_with_llm(batch, api_key=api_key)
             encoding_store.add_proposals(
                 batch.id, proposals, method="llm:claude",
                 prompt=prompt, raw_response=raw_response,
+                prompt_key=user_prompt_key,
+                system_prompt_key=system_prompt_key,
             )
         except Exception as e:
             # Fallback to manual on error
