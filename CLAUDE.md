@@ -110,6 +110,15 @@ To add a new rule type: extend the `RuleType` enum in `models.py`, add the evalu
 - Interactive API docs: `/docs`
 - Frozen contract: `docs/api/openapi-v0.2.0.json` (Phase 0 snapshot, 27 routes)
 
+## Dev Environment
+
+- **VS Code**: `.vscode/settings.json` pins the venv interpreter (Windows path; macOS/Linux contributors should swap `Scripts` → `bin`), enables pytest, sets file nesting (source ↔ tests). `.vscode/extensions.json` recommends the install set (Python/Pylance, Ruff, Red Hat YAML, Even Better TOML, Markdown All in One, GitLens, REST Client, Conventional Commits, Claude Code).
+- **Project-level Claude hooks** in `.claude/settings.json` (only active when a Claude session is anchored at this directory or below):
+  - **PreToolUse → Bash**: when a `git commit` is about to run, executes `pytest -q` and **blocks** the commit (exit 2) on failure. Script: `scripts/claude-hooks/pre-commit-pytest.sh`.
+  - **PostToolUse → Edit/Write**: after a `.py` file inside this project is edited, runs `pytest --collect-only -q` and warns on import/syntax breaks (does not block). Script: `scripts/claude-hooks/post-edit-pycollect.sh`.
+  - The hooks autodetect `.venv/Scripts/activate` (Windows) or `.venv/bin/activate` (macOS/Linux).
+- **Conventional Commits** adopted from Phase 0. Format: `type(scope): subject`. Types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`, `phase-N` (for v2.0 phase work).
+
 ## Documentation Conventions
 
 From `.github/copilot-instructions.md` — preserve when editing docs:

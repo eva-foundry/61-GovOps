@@ -29,7 +29,7 @@ Comments are decisive. Legal contributors need to annotate why a value was chose
 ## Mitigations for YAML risks
 
 - **YAML 1.2 only** (no YAML 1.1; stops the Norway problem and other type-coercion surprises).
-- **Schema-first**: every YAML file declares `# yaml-language-server: $schema=...` at the top; CI validates the parsed structure against the JSON Schema before accepting.
+- **Schema-first**: every YAML file declares `# yaml-language-server: $schema=../../schema/lawcode-v1.0.json` (or appropriate relative path) at the top — this gives editor autocomplete + inline validation via the Red Hat YAML extension (recommended in `.vscode/extensions.json`). CI also validates the parsed structure against the JSON Schema before accepting.
 - **No anchors/aliases** in lawcode YAML: keep the on-disk shape directly mappable to the schema. Reuse happens at the ConfigStore layer (global-scope vs jurisdiction override), not via YAML anchors.
 - **Quote all string scalars** that look like booleans, dates, or numbers (`"on"`, `"yes"`, `"01"`). Reviewers flag any unquoted such strings in PR review.
 - **Single trailing newline**, **2-space indent**, **no tabs** — enforced via pre-commit `yamllint`.
