@@ -79,14 +79,45 @@ test("home: modules + actors + walkthrough CTA all render", async ({ page }) => 
   });
 });
 
-test("breadcrumb: walkthrough page shows a breadcrumb back to home", async ({ page }) => {
-  await page.goto("/walkthrough");
+// Breadcrumb is rendered universally by the layout for every non-home route.
+// Verify it on every primary route — none should be missing it.
+const NON_HOME_ROUTES = [
+  "/walkthrough",
+  "/authority",
+  "/about",
+  "/policies",
+  "/cases",
+  "/encode",
+  "/encode/new",
+  "/config",
+  "/config/draft",
+  "/config/diff",
+  "/config/approvals",
+  "/config/prompts",
+  "/admin",
+];
+
+for (const route of NON_HOME_ROUTES) {
+  test(`breadcrumb: ${route} renders the layout-level breadcrumb`, async ({ page }) => {
+    await page.goto(route);
+    await page.waitForLoadState("networkidle");
+    const crumbNav = page.locator('[data-testid="breadcrumb"]');
+    await expect(crumbNav).toBeVisible();
+    // The first link is always the home crumb.
+    await expect(crumbNav.getByRole("link").first()).toHaveAttribute("href", "/");
+    // The current page is the last list item — non-link, with aria-current="page".
+    await expect(
+      crumbNav.locator('li [aria-current="page"]').first(),
+    ).toBeVisible();
+  });
+}
+
+test("breadcrumb: home page does NOT render a breadcrumb (no orientation noise)", async ({
+  page,
+}) => {
+  await page.goto("/");
   await page.waitForLoadState("networkidle");
-  // Breadcrumb is a nav with role=list; the home crumb is a link with the
-  // home icon's sr-only label, and the current page crumb is non-link text.
-  const crumbNav = page.locator('[data-testid="breadcrumb"]');
-  await expect(crumbNav).toBeVisible();
-  await expect(crumbNav.getByRole("link").first()).toHaveAttribute("href", "/");
+  await expect(page.locator('[data-testid="breadcrumb"]')).toHaveCount(0);
 });
 
 test("breadcrumb: stays visible (sticky) when the page is scrolled", async ({ page }) => {

@@ -8,7 +8,6 @@ import type {
   DecisionOutcome,
   ReviewActionType,
 } from "@/lib/types";
-import { Breadcrumb } from "@/components/govops/Breadcrumb";
 import { ApplicantPane } from "@/components/govops/cases/ApplicantPane";
 import { RecommendationPane } from "@/components/govops/cases/RecommendationPane";
 import { ReviewPane } from "@/components/govops/cases/ReviewPane";
@@ -66,12 +65,6 @@ function CaseDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumb
-        items={[
-          { label: "nav.cases", i18n: true, to: "/cases" },
-          { label: caseId, truncate: true },
-        ]}
-      />
       <div className="flex items-center justify-between gap-3">
         <Link
           to="/cases"
