@@ -4,6 +4,7 @@ import appCss from "../styles.css?url";
 import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
 import { Masthead } from "@/components/govops/Masthead";
+import { PageBreadcrumb } from "@/components/govops/PageBreadcrumb";
 import { SkipToContent } from "@/components/govops/SkipToContent";
 import { Toaster } from "@/components/ui/sonner";
 import { RouteError } from "@/components/govops/RouteError";
@@ -94,6 +95,7 @@ function RootComponent() {
         <SkipToContent />
         <Masthead />
         <main id="main" className="mx-auto max-w-5xl px-6 py-10">
+          <PageBreadcrumb />
           <Outlet />
         </main>
         <footer

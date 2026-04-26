@@ -7,7 +7,6 @@ import { filterMockConfigValues } from "@/lib/mock-config-values";
 import type { ConfigValue, ListConfigValuesResponse } from "@/lib/types";
 import { ProvenanceRibbon } from "@/components/govops/ProvenanceRibbon";
 import { JurisdictionChip } from "@/components/govops/JurisdictionChip";
-import { Breadcrumb } from "@/components/govops/Breadcrumb";
 import { RouteError } from "@/components/govops/RouteError";
 import { RouteLoading } from "@/components/govops/RouteLoading";
 import {
@@ -102,12 +101,6 @@ function PromptsPage() {
 
   return (
     <section aria-labelledby="prompts-heading" className="space-y-8">
-      <Breadcrumb
-        items={[
-          { label: "nav.config", i18n: true, to: "/config" },
-          { label: "nav.prompts", i18n: true },
-        ]}
-      />
       <header className="flex items-stretch">
         <ProvenanceRibbon variant="hybrid" />
         <div className="space-y-3">
