@@ -119,3 +119,42 @@ def test_seeded_parameter_values_match_legacy_registry():
                     f"Drift between LEGACY[{key}] and seeded value: "
                     f"{LEGACY_CONSTANTS[key]!r} vs {runtime_value!r}"
                 )
+
+
+# ---------------------------------------------------------------------------
+# Domain 2 (engine.threshold) coverage
+# ---------------------------------------------------------------------------
+
+ENGINE_THRESHOLD_KEYS = [
+    "global.engine.evidence.dob_types",
+    "global.engine.evidence.residency_types",
+]
+
+
+def test_engine_threshold_keys_registered():
+    """engine.threshold.* keys the engine reads must exist in LEGACY_CONSTANTS."""
+    for key in ENGINE_THRESHOLD_KEYS:
+        assert key in LEGACY_CONSTANTS, f"Missing engine.threshold legacy entry: {key}"
+
+
+def test_engine_dob_evidence_types_match_runtime():
+    """The DOB-evidence list the engine reads must match what we registered."""
+    from govops.legacy_constants import resolve_param
+
+    runtime = resolve_param("global.engine.evidence.dob_types")
+    assert "birth_certificate" in runtime
+    assert "passport" in runtime
+    assert "id_card" in runtime
+    assert len(runtime) == 3
+
+
+def test_engine_residency_evidence_types_match_runtime():
+    """The residency-evidence list the engine reads must match what we registered."""
+    from govops.legacy_constants import resolve_param
+
+    runtime = resolve_param("global.engine.evidence.residency_types")
+    assert "tax_record" in runtime
+    assert "residency_declaration" in runtime
+    assert "passport_stamps" in runtime
+    assert "utility_bill" in runtime
+    assert len(runtime) == 4

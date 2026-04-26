@@ -84,6 +84,22 @@ register_legacy("ua.rule.evidence.required_types", ["birth_certificate"])
 
 
 # ---------------------------------------------------------------------------
+# Domain 2: engine.threshold.*
+# Evidence-type vocabularies the engine uses to classify supplied evidence
+# items. Globally scoped — every jurisdiction's engine reads the same lists.
+# ---------------------------------------------------------------------------
+
+register_legacy(
+    "global.engine.evidence.dob_types",
+    ["birth_certificate", "passport", "id_card"],
+)
+register_legacy(
+    "global.engine.evidence.residency_types",
+    ["tax_record", "residency_declaration", "passport_stamps", "utility_bill"],
+)
+
+
+# ---------------------------------------------------------------------------
 # Phase 2 helper — resolve via the two-tier resolver with no substrate set.
 # At module load (seed time), the substrate ConfigStore is empty, so every
 # call falls through to LEGACY_CONSTANTS. After Phase 3 lands the YAML
