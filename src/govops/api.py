@@ -262,13 +262,21 @@ def list_config_values(
     key_prefix: str | None = None,
     jurisdiction_id: str | None = None,
     language: str | None = None,
+    status: str | None = None,
 ):
     """List ConfigValue records, optionally filtered."""
+    status_enum: ApprovalStatus | None = None
+    if status is not None:
+        try:
+            status_enum = ApprovalStatus(status)
+        except ValueError as exc:
+            raise HTTPException(400, f"Invalid status: {status}") from exc
     rows = config_store.list(
         domain=domain,
         key_prefix=key_prefix,
         jurisdiction_id=jurisdiction_id,
         language=language,
+        status=status_enum,
     )
     return {"values": rows, "count": len(rows)}
 
