@@ -450,3 +450,202 @@ def test_supersede_on_unknown_id_raises():
             effective_from=datetime(2027, 1, 1, tzinfo=UTC),
             author="reviewer",
         )
+
+
+# ---------------------------------------------------------------------------
+# find_by_citation (Phase 7 reverse-index)
+# ---------------------------------------------------------------------------
+
+
+def _populate_citation_fixture(store: ConfigStore) -> None:
+    """Three records, two of which share a citation; one global, one CA, one FR."""
+    store.put(
+        _cv(
+            "ca-oas.rule.age-65.min_age",
+            65,
+            datetime(1985, 1, 1, tzinfo=UTC),
+            jurisdiction_id="ca-oas",
+            citation="OAS Act, R.S.C. 1985, c. O-9, s. 3(1)",
+        )
+    )
+    store.put(
+        _cv(
+            "ca-oas.rule.age-65.min_years",
+            10,
+            datetime(1985, 1, 1, tzinfo=UTC),
+            jurisdiction_id="ca-oas",
+            citation="OAS Act, R.S.C. 1985, c. O-9, s. 3(2)",
+        )
+    )
+    store.put(
+        _cv(
+            "fr-cnav.rule.age.min_age",
+            62,
+            datetime(2010, 11, 9, tzinfo=UTC),
+            jurisdiction_id="fr-cnav",
+            citation="Code de la sécurité sociale, art. L. 161-17-2",
+        )
+    )
+    store.put(
+        _cv(
+            "global.engine.evidence.dob_types",
+            ["birth_certificate", "passport"],
+            datetime(2024, 1, 1, tzinfo=UTC),
+            value_type=ValueType.LIST,
+            jurisdiction_id=None,
+            citation="GovOps engine convention v1.0",
+        )
+    )
+
+
+def test_find_by_citation_substring_match():
+    store = ConfigStore()
+    _populate_citation_fixture(store)
+    rows = store.find_by_citation("R.S.C. 1985, c. O-9")
+    assert len(rows) == 2
+    keys = {r.key for r in rows}
+    assert keys == {"ca-oas.rule.age-65.min_age", "ca-oas.rule.age-65.min_years"}
+
+
+def test_find_by_citation_is_case_insensitive():
+    store = ConfigStore()
+    _populate_citation_fixture(store)
+    upper = store.find_by_citation("OAS ACT")
+    lower = store.find_by_citation("oas act")
+    assert {r.id for r in upper} == {r.id for r in lower}
+    assert len(upper) == 2
+
+
+def test_find_by_citation_normalizes_whitespace():
+    store = ConfigStore()
+    _populate_citation_fixture(store)
+    # Both fixture citations are "OAS Act, R.S.C. 1985, c. O-9, s. 3(1)" / "s. 3(2)";
+    # the irregular spacing/newlines in `spaced` should normalize to "c. O-9, s. 3"
+    # and match both of them.
+    spaced = store.find_by_citation("c.\n   O-9,\ts.")
+    direct = store.find_by_citation("c. O-9, s.")
+    assert {r.id for r in spaced} == {r.id for r in direct}
+    assert len(direct) == 2
+
+
+def test_find_by_citation_returns_global_records():
+    store = ConfigStore()
+    _populate_citation_fixture(store)
+    rows = store.find_by_citation("GovOps engine convention")
+    assert len(rows) == 1
+    assert rows[0].jurisdiction_id is None
+
+
+def test_find_by_citation_excludes_rejected():
+    store = ConfigStore()
+    store.put(
+        _cv(
+            "ca-oas.rule.age-65.min_age",
+            65,
+            datetime(1985, 1, 1, tzinfo=UTC),
+            jurisdiction_id="ca-oas",
+            citation="OAS Act, s. 3(1)",
+        )
+    )
+    store.put(
+        _cv(
+            "ca-oas.rule.age-65.min_age",
+            67,
+            datetime(2030, 1, 1, tzinfo=UTC),
+            jurisdiction_id="ca-oas",
+            citation="OAS Act, s. 3(1)",
+            status=ApprovalStatus.REJECTED,
+        )
+    )
+    rows = store.find_by_citation("OAS Act, s. 3(1)")
+    assert len(rows) == 1
+    assert rows[0].status == ApprovalStatus.APPROVED
+
+
+def test_find_by_citation_includes_pending_and_draft():
+    store = ConfigStore()
+    store.put(
+        _cv(
+            "ca-oas.rule.age-65.min_age",
+            65,
+            datetime(1985, 1, 1, tzinfo=UTC),
+            jurisdiction_id="ca-oas",
+            citation="OAS Act, s. 3(1)",
+        )
+    )
+    store.put(
+        _cv(
+            "ca-oas.rule.age-65.min_age",
+            66,
+            datetime(2028, 1, 1, tzinfo=UTC),
+            jurisdiction_id="ca-oas",
+            citation="OAS Act, s. 3(1)",
+            status=ApprovalStatus.PENDING,
+        )
+    )
+    store.put(
+        _cv(
+            "ca-oas.rule.age-65.min_age",
+            67,
+            datetime(2030, 1, 1, tzinfo=UTC),
+            jurisdiction_id="ca-oas",
+            citation="OAS Act, s. 3(1)",
+            status=ApprovalStatus.DRAFT,
+        )
+    )
+    rows = store.find_by_citation("OAS Act, s. 3(1)")
+    statuses = sorted(r.status for r in rows)
+    assert statuses == sorted(
+        [ApprovalStatus.APPROVED, ApprovalStatus.PENDING, ApprovalStatus.DRAFT]
+    )
+
+
+def test_find_by_citation_empty_query_returns_empty():
+    store = ConfigStore()
+    _populate_citation_fixture(store)
+    assert store.find_by_citation("") == []
+    assert store.find_by_citation("   \n\t") == []
+
+
+def test_find_by_citation_no_matches_returns_empty():
+    store = ConfigStore()
+    _populate_citation_fixture(store)
+    assert store.find_by_citation("non-existent statute") == []
+
+
+def test_find_by_citation_skips_records_with_null_citation():
+    store = ConfigStore()
+    store.put(
+        _cv(
+            "ca-oas.rule.age-65.min_age",
+            65,
+            datetime(1985, 1, 1, tzinfo=UTC),
+            jurisdiction_id="ca-oas",
+            citation=None,
+        )
+    )
+    assert store.find_by_citation("OAS Act") == []
+
+
+def test_find_by_citation_results_sorted_by_jurisdiction_then_key():
+    store = ConfigStore()
+    _populate_citation_fixture(store)
+    # Add another global record so we exercise the sort.
+    store.put(
+        _cv(
+            "global.engine.evidence.residency_types",
+            ["tax_record"],
+            datetime(2024, 1, 1, tzinfo=UTC),
+            value_type=ValueType.LIST,
+            jurisdiction_id=None,
+            citation="GovOps engine convention v1.0",
+        )
+    )
+    rows = store.find_by_citation("convention")
+    # Globals (jurisdiction_id None) sort before populated jurisdictions because
+    # ``r.jurisdiction_id or ""`` produces the empty string.
+    assert all(r.jurisdiction_id is None for r in rows)
+    assert [r.key for r in rows] == [
+        "global.engine.evidence.dob_types",
+        "global.engine.evidence.residency_types",
+    ]

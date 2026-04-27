@@ -41,6 +41,12 @@ from govops.models import (
     HumanReviewAction,
     ReviewAction,
 )
+from govops.screen import (
+    ScreenRequest,
+    ScreenResponse,
+    UnknownJurisdiction,
+    run_screen,
+)
 from govops.store import DemoStore
 
 # ---------------------------------------------------------------------------
@@ -560,6 +566,94 @@ def reject_config_value(value_id: str, body: ReviewRequest):
         comment=body.comment,
     )
     return cv
+
+
+# ---------------------------------------------------------------------------
+# Impact / reverse-index API (Law-as-Code v2.0 Phase 7)
+# ---------------------------------------------------------------------------
+
+def _jurisdiction_label(jurisdiction_id: str | None) -> str:
+    """Best-effort human label for a ConfigValue ``jurisdiction_id``.
+
+    Records carry ids like ``ca-oas`` or ``fr-cnav``; the registry is keyed by
+    the country code (``ca``, ``fr``). Falls back to the raw id when the prefix
+    doesn't resolve, so unknown jurisdictions still render meaningfully.
+    """
+    if jurisdiction_id is None:
+        return "Global"
+    code = jurisdiction_id.split("-", 1)[0]
+    pack = JURISDICTION_REGISTRY.get(code)
+    if pack is None:
+        return jurisdiction_id
+    return f"{pack.program_name} — {pack.jurisdiction.name}"
+
+
+@app.get("/api/impact")
+def impact_by_citation(citation: str = ""):
+    """Return ConfigValues referencing ``citation``, grouped by jurisdiction.
+
+    Phase 7 reverse-index endpoint. Empty / whitespace ``citation`` rejects with
+    400 so clients always send a meaningful query. Normalization (whitespace
+    collapse + case-insensitive match) lives in ``ConfigStore.find_by_citation``.
+    """
+    if not citation or not citation.strip():
+        raise HTTPException(400, "citation query parameter is required and must be non-empty")
+    normalized = " ".join(citation.split())
+    matches = config_store.find_by_citation(normalized)
+
+    groups: dict[str | None, list[ConfigValue]] = {}
+    for cv in matches:
+        scope: str | None = None if cv.jurisdiction_id in (None, "global") else cv.jurisdiction_id
+        groups.setdefault(scope, []).append(cv)
+
+    results: list[dict[str, Any]] = []
+    if None in groups:
+        results.append(
+            {
+                "jurisdiction_id": None,
+                "jurisdiction_label": _jurisdiction_label(None),
+                "values": groups[None],
+            }
+        )
+    for jid in sorted(k for k in groups if k is not None):
+        results.append(
+            {
+                "jurisdiction_id": jid,
+                "jurisdiction_label": _jurisdiction_label(jid),
+                "values": groups[jid],
+            }
+        )
+
+    return {
+        "query": normalized,
+        "total": len(matches),
+        "jurisdiction_count": len(results),
+        "results": results,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Self-screening API (Law-as-Code v2.0 Phase 10A)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/screen", response_model=ScreenResponse)
+def screen(req: ScreenRequest) -> ScreenResponse:
+    """Anonymous citizen-facing eligibility pre-check.
+
+    Phase 10A: runs the engine against the supplied facts and returns a
+    decision-support hint. **No case row is created**, **no audit entry is
+    written**, and the response carries no PII or applicant identifier.
+    Repeated calls with the same payload are stateless on the server side.
+    """
+    try:
+        return run_screen(req)
+    except UnknownJurisdiction as exc:
+        raise HTTPException(
+            404,
+            f"Unknown jurisdiction '{exc.args[0]}'. "
+            f"Known: {sorted(JURISDICTION_REGISTRY)}",
+        ) from exc
 
 
 # ---------------------------------------------------------------------------

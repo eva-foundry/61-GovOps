@@ -476,6 +476,43 @@ class ConfigStore:
                 out.append(r)
             return out
 
+    # --- impact / citation search (Phase 7) ---
+
+    def find_by_citation(self, citation: str) -> list[ConfigValue]:
+        """Return ConfigValues whose citation contains ``citation`` (case-insensitive substring).
+
+        Phase 7 reverse-index entry point: drives ``GET /api/impact?citation=…`` and the
+        ``govops impact-of`` CLI. Excludes ``REJECTED`` records (they are tombstones of
+        proposals that didn't make it into the substrate); ``DRAFT`` and ``PENDING``
+        records are included so in-flight policy work shows up alongside approved values.
+
+        Whitespace in the query is normalized to single spaces; the comparison is
+        Python-side casefold so non-ASCII citations match consistently across the
+        SQLite ICU/no-ICU split.
+        """
+        needle = " ".join(citation.split()).casefold()
+        if not needle:
+            return []
+        with self._session() as s:
+            stmt = select(ConfigValue).where(
+                ConfigValue.citation.is_not(None),
+                ConfigValue.status != ApprovalStatus.REJECTED,
+            )
+            rows = list(s.exec(stmt))
+        out: list[ConfigValue] = []
+        for r in rows:
+            if r.citation is None:
+                continue
+            haystack = " ".join(r.citation.split()).casefold()
+            if needle not in haystack:
+                continue
+            r.effective_from = _ensure_utc(r.effective_from)
+            r.effective_to = _ensure_utc(r.effective_to)
+            r.created_at = _ensure_utc(r.created_at)
+            out.append(r)
+        out.sort(key=lambda r: ((r.jurisdiction_id or ""), r.key, r.effective_from))
+        return out
+
     # --- YAML loader (Phase 3 / ADR-003 / ADR-010 hydration) ---
 
     def load_from_yaml(self, path: "str | os.PathLike[str]") -> int:

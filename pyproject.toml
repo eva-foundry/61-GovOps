@@ -43,6 +43,7 @@ dev = [
 
 [project.scripts]
 govops-demo = "govops.cli:main"
+govops = "govops.cli:dispatch"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/govops"]
