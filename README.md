@@ -6,6 +6,8 @@
 
 GovOps turns authoritative governance sources into coherent, traceable, executable service logic. It is a disciplined construction approach for systems whose true specification lives outside the codebase -- in statutes, regulations, and policy.
 
+**Law-as-Code v2.0** has shipped: every statutory value (thresholds, accepted statuses, calculation coefficients, prompts) lives as a dated `ConfigValue` record. Behaviour changes are configuration writes, not deploys. A case evaluated against 2025 still resolves with 2025's substrate even after the rules change in 2026. A second repo can publish its own jurisdiction with an Ed25519-signed manifest and federate into a GovOps deployment. See [PLAN.md](PLAN.md) for the build, [docs/design/LAW-AS-CODE.md](docs/design/LAW-AS-CODE.md) for the SPRIND-element mapping, and [docs/design/ADRs/](docs/design/ADRs/) for the load-bearing decisions.
+
 This is an open public-good contribution for the global public sector: something governments can study, adapt, and use without vendor capture or hidden decision logic.
 
 **Project home**: [eva-foundry.github.io/61-GovOps](https://eva-foundry.github.io/61-GovOps/) · **Source**: [github.com/eva-foundry/61-GovOps](https://github.com/eva-foundry/61-GovOps)
@@ -187,14 +189,22 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-65 tests covering:
+343 backend tests covering (all green on Python 3.10/3.11/3.12):
 - Rule engine unit tests (all decision paths, edge cases, residency calculation)
 - Determinism verification (identical inputs = identical outputs)
 - Authority traceability (every rule has a statutory citation)
-- Multi-jurisdiction switching and evaluation
-- Encoding pipeline (LLM response parsing, proposal review, batch lifecycle)
-- API integration tests (full case workflow)
-- HTML UI smoke tests
+- Multi-jurisdiction switching and evaluation across 6 jurisdictions
+- Encoding pipeline (LLM response parsing, proposal review, batch lifecycle, YAML emission)
+- API integration tests (full case workflow + Phase 7 impact + Phase 8 federation)
+- ConfigValue substrate (round-trip, effective-date semantics, supersession chain)
+- Calculation rules (typed-AST formula evaluation, per-step citations)
+- Self-screening (citizen-facing, no PII echo, no audit row)
+- Notice rendering (template-as-ConfigValue, sha256 in audit)
+- Event-driven reassessment (supersession chain, life-event replay)
+- Federation (Ed25519 signing, manifest verification, fail-closed pipeline)
+- Date-aware substrate resolution (scalar + formula `ref` honour `evaluation_date`)
+
+Plus a Playwright + axe E2E suite under `web/e2e/` covering the citizen and operator surfaces.
 
 ---
 
