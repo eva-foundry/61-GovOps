@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from govops.config import LEGACY_CONSTANTS, ConfigKeyNotMigrated, ResolutionSource
+from govops.config import ConfigKeyNotMigrated, ResolutionSource
 from govops.jurisdictions import JURISDICTION_REGISTRY
 from govops.legacy_constants import _JURISDICTION_PREFIX_TO_ID, _resolver
 from govops.models import RuleType

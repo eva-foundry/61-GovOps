@@ -12,11 +12,9 @@ approval policy (procedural enforcement until the Phase 6 admin UI ships).
 
 from __future__ import annotations
 
-import pytest
 
 from govops.config import ResolutionSource
 from govops.encoder import (
-    EncodingBatch,
     EncodingStore,
     EXTRACTION_SYSTEM_PROMPT,
     EXTRACTION_SYSTEM_PROMPT_KEY,

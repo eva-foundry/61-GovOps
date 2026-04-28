@@ -19,10 +19,8 @@ Coverage:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pytest
-import yaml
 
 from govops.config import ConfigStore
 from govops.federation import (
@@ -31,11 +29,15 @@ from govops.federation import (
     ManifestHashMismatch,
     MissingSignature,
     SignatureMismatch,
+    UnsafePath,
     UntrustedPublisher,
+    _safe_publisher_id,
+    _safe_relative_path,
     canonicalize_for_signing,
     fetch_pack,
     generate_keypair,
     sha256_hex,
+    set_pack_enabled,
     sign_manifest,
     verify_manifest_signature,
 )
@@ -423,3 +425,69 @@ class TestLoadProvenance:
         assert record.source_publisher is None
         assert record.source_signed is None
         assert record.fetched_at is None
+
+
+# ---------------------------------------------------------------------------
+# Path-traversal guards (defense-in-depth — even with allowlist + signed
+# manifest, validate publisher_id and manifest paths before they reach the
+# filesystem). CodeQL `py/path-injection` previously flagged the construction
+# sites; these tests pin the guards.
+# ---------------------------------------------------------------------------
+
+
+class TestPublisherIdGuard:
+    def test_accepts_well_formed_id(self):
+        for ok in ("acme", "acme-pension", "acme_inss", "br1", "x"):
+            assert _safe_publisher_id(ok) == ok
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "../etc",
+            "../../passwd",
+            "foo/bar",
+            "foo\\bar",
+            "C:foo",
+            ".hidden",
+            "-leading-dash",
+            "_leading-underscore",
+            "Upper",
+            "with space",
+            "",
+            "with.dot",
+        ],
+    )
+    def test_rejects_traversal_or_separator(self, bad):
+        with pytest.raises(UnsafePath):
+            _safe_publisher_id(bad)
+
+
+class TestManifestPathGuard:
+    def test_accepts_relative_paths(self):
+        for ok in ("config/rules.yaml", "global/notices.yaml", "x.yaml", "a/b/c.yaml"):
+            assert _safe_relative_path(ok) == ok
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            "../../etc/passwd",
+            "/etc/passwd",
+            "..",
+            "config/../../escape.yaml",
+            "C:/Windows/System32",
+            "C:\\Windows",
+            "config\\rules.yaml",  # backslash forbidden
+            "",
+        ],
+    )
+    def test_rejects_unsafe_paths(self, bad):
+        with pytest.raises(UnsafePath):
+            _safe_relative_path(bad)
+
+
+class TestSetPackEnabledGuard:
+    def test_unsafe_publisher_id_raises(self, tmp_path):
+        federated = tmp_path / ".federated"
+        federated.mkdir()
+        with pytest.raises(UnsafePath):
+            set_pack_enabled(federated, "../escape", enabled=False)
