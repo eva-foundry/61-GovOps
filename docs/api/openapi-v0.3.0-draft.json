@@ -217,7 +217,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReviewRequest"
+                "$ref": "#/components/schemas/govops__api__ReviewRequest__1"
               }
             }
           }
@@ -350,10 +350,61 @@
               ],
               "title": "Language"
             }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
           }
         ],
         "responses": {
           "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Config Value",
+        "description": "Create a new ConfigValue draft. Status starts at DRAFT; an /approve\ncall is required before the record participates in resolution.",
+        "operationId": "create_config_value_api_config_values_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConfigValueRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -552,6 +603,228 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config/values/{value_id}/approve": {
+      "post": {
+        "summary": "Approve Config Value",
+        "description": "Approve a draft/pending ConfigValue. Sets status=APPROVED and\napproved_by; the record now participates in resolution.",
+        "operationId": "approve_config_value_api_config_values__value_id__approve_post",
+        "parameters": [
+          {
+            "name": "value_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Value Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config/values/{value_id}/request-changes": {
+      "post": {
+        "summary": "Request Changes Config Value",
+        "description": "Send a pending value back to draft for further author edits.",
+        "operationId": "request_changes_config_value_api_config_values__value_id__request_changes_post",
+        "parameters": [
+          {
+            "name": "value_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Value Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/govops__api__ReviewRequest__2"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config/values/{value_id}/reject": {
+      "post": {
+        "summary": "Reject Config Value",
+        "description": "Reject a draft/pending ConfigValue. Terminal state — record is kept\nfor audit but never participates in resolution.",
+        "operationId": "reject_config_value_api_config_values__value_id__reject_post",
+        "parameters": [
+          {
+            "name": "value_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Value Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/govops__api__ReviewRequest__2"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/impact": {
+      "get": {
+        "summary": "Impact By Citation",
+        "description": "Return ConfigValues referencing ``citation``, grouped by jurisdiction.\n\nPhase 7 reverse-index endpoint. Empty / whitespace ``citation`` rejects with\n400 so clients always send a meaningful query. Normalization (whitespace\ncollapse + case-insensitive match) lives in ``ConfigStore.find_by_citation``.",
+        "operationId": "impact_by_citation_api_impact_get",
+        "parameters": [
+          {
+            "name": "citation",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Citation"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screen": {
+      "post": {
+        "summary": "Screen",
+        "description": "Anonymous citizen-facing eligibility pre-check.\n\nPhase 10A: runs the engine against the supplied facts and returns a\ndecision-support hint. **No case row is created**, **no audit entry is\nwritten**, and the response carries no PII or applicant identifier.\nRepeated calls with the same payload are stateless on the server side.",
+        "operationId": "screen_api_screen_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResponse"
+                }
               }
             }
           },
@@ -1036,6 +1309,120 @@
   },
   "components": {
     "schemas": {
+      "ApproveRequest": {
+        "properties": {
+          "approved_by": {
+            "type": "string",
+            "title": "Approved By"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "approved_by"
+        ],
+        "title": "ApproveRequest"
+      },
+      "CreateConfigValueRequest": {
+        "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "jurisdiction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jurisdiction Id"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "value_type": {
+            "$ref": "#/components/schemas/ValueType"
+          },
+          "effective_from": {
+            "type": "string",
+            "title": "Effective From"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "citation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Citation"
+          },
+          "author": {
+            "type": "string",
+            "title": "Author"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "default": ""
+          },
+          "supersedes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "type": "object",
+        "required": [
+          "domain",
+          "key",
+          "value",
+          "value_type",
+          "effective_from",
+          "author"
+        ],
+        "title": "CreateConfigValueRequest"
+      },
       "DecisionOutcome": {
         "type": "string",
         "enum": [
@@ -1070,32 +1457,260 @@
         ],
         "title": "ReviewAction"
       },
-      "ReviewRequest": {
+      "ScreenBenefitAmount": {
         "properties": {
-          "action": {
-            "$ref": "#/components/schemas/ReviewAction"
+          "value": {
+            "type": "number",
+            "title": "Value"
           },
-          "rationale": {
+          "currency": {
             "type": "string",
-            "title": "Rationale",
-            "default": ""
+            "title": "Currency",
+            "default": "CAD"
           },
-          "final_outcome": {
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "default": "monthly"
+          },
+          "formula_trace": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Formula Trace"
+          },
+          "citations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Citations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "title": "ScreenBenefitAmount",
+        "description": "Citizen-facing projection of the entitlement amount (Phase 10B / ADR-011).\n\nMirrors ``models.BenefitAmount`` but stays its own type so the screen\ncontract can evolve independently of the officer/audit shape. The\n``formula_trace`` is preserved verbatim so the citizen-facing surface\ncan render the same per-step trace the audit package shows officers —\nsame evidence, different audience."
+      },
+      "ScreenEvidence": {
+        "properties": {
+          "dob": {
+            "type": "boolean",
+            "title": "Dob",
+            "default": false
+          },
+          "residency": {
+            "type": "boolean",
+            "title": "Residency",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ScreenEvidence"
+      },
+      "ScreenRequest": {
+        "properties": {
+          "jurisdiction_id": {
+            "type": "string",
+            "title": "Jurisdiction Id"
+          },
+          "date_of_birth": {
+            "type": "string",
+            "format": "date",
+            "title": "Date Of Birth"
+          },
+          "legal_status": {
+            "type": "string",
+            "title": "Legal Status"
+          },
+          "country_of_birth": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/DecisionOutcome"
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Of Birth"
+          },
+          "residency_periods": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenResidencyPeriod"
+            },
+            "type": "array",
+            "title": "Residency Periods"
+          },
+          "evidence_present": {
+            "$ref": "#/components/schemas/ScreenEvidence"
+          },
+          "evaluation_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluation Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jurisdiction_id",
+          "date_of_birth",
+          "legal_status"
+        ],
+        "title": "ScreenRequest"
+      },
+      "ScreenResidencyPeriod": {
+        "properties": {
+          "country": {
+            "type": "string",
+            "title": "Country"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "country",
+          "start_date"
+        ],
+        "title": "ScreenResidencyPeriod"
+      },
+      "ScreenResponse": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "pension_type": {
+            "type": "string",
+            "title": "Pension Type",
+            "default": ""
+          },
+          "partial_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partial Ratio"
+          },
+          "benefit_amount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScreenBenefitAmount"
               },
               {
                 "type": "null"
               }
             ]
+          },
+          "rule_results": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenRuleResult"
+            },
+            "type": "array",
+            "title": "Rule Results"
+          },
+          "missing_evidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Evidence"
+          },
+          "jurisdiction_label": {
+            "type": "string",
+            "title": "Jurisdiction Label"
+          },
+          "evaluation_date": {
+            "type": "string",
+            "title": "Evaluation Date"
+          },
+          "disclaimer": {
+            "type": "string",
+            "title": "Disclaimer",
+            "default": "This is decision support, not a determination. Apply through the program for an official decision."
           }
         },
         "type": "object",
         "required": [
-          "action"
+          "outcome",
+          "jurisdiction_label",
+          "evaluation_date"
         ],
-        "title": "ReviewRequest"
+        "title": "ScreenResponse"
+      },
+      "ScreenRuleResult": {
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "citation": {
+            "type": "string",
+            "title": "Citation"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule_id",
+          "description",
+          "citation",
+          "outcome"
+        ],
+        "title": "ScreenRuleResult"
       },
       "ValidationError": {
         "properties": {
@@ -1136,6 +1751,65 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "ValueType": {
+        "type": "string",
+        "enum": [
+          "number",
+          "string",
+          "bool",
+          "list",
+          "object",
+          "enum",
+          "prompt",
+          "formula"
+        ],
+        "title": "ValueType"
+      },
+      "govops__api__ReviewRequest__1": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ReviewAction"
+          },
+          "rationale": {
+            "type": "string",
+            "title": "Rationale",
+            "default": ""
+          },
+          "final_outcome": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionOutcome"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "ReviewRequest"
+      },
+      "govops__api__ReviewRequest__2": {
+        "properties": {
+          "reviewer": {
+            "type": "string",
+            "title": "Reviewer"
+          },
+          "comment": {
+            "type": "string",
+            "title": "Comment",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "reviewer"
+        ],
+        "title": "ReviewRequest"
       }
     }
   }
