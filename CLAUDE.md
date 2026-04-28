@@ -17,7 +17,7 @@ Built on **FKTE** (Fractal Knowledge Transformation Engine):
 
 ## Current State
 
-6 jurisdictions (CA/BR/ES/FR/DE/UA), 6 languages (en/fr/pt/es/de/uk), **98 backend tests passing**.
+7 jurisdictions (CA/BR/ES/FR/DE/UA/JP), 6 languages (en/fr/pt/es/de/uk), **375 backend tests passing**.
 
 **Backend (Python / FastAPI):**
 - Deterministic rule engine for pension eligibility (age, residency/contribution, legal status, evidence)
