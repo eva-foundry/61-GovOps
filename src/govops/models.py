@@ -202,6 +202,37 @@ class Recommendation(BaseModel):
     missing_evidence: list[str] = []
     flags: list[str] = []
     benefit_amount: Optional[BenefitAmount] = None  # populated when ELIGIBLE + calc rule present
+    supersedes: Optional[str] = None  # ADR-013 — id of the prior recommendation, if any
+    evaluation_date: Optional[date] = None  # ADR-013 — the as-of date this evaluation answers
+    triggered_by_event_id: Optional[str] = None  # ADR-013 — the event that prompted this re-eval
+
+
+# ---------------------------------------------------------------------------
+# Life events (Law-as-Code v2.0 / ADR-013)
+# ---------------------------------------------------------------------------
+
+class EventType(str, Enum):
+    MOVE_COUNTRY = "move_country"
+    CHANGE_LEGAL_STATUS = "change_legal_status"
+    ADD_EVIDENCE = "add_evidence"
+    RE_EVALUATE = "re_evaluate"  # marker; no state delta
+
+
+class CaseEvent(BaseModel):
+    """An append-only life event that may trigger reassessment.
+
+    Per ADR-013, events are the source-of-truth for case state at any
+    historical date — applying events whose ``effective_date <= D`` to
+    the case as it was originally created reconstructs the case as of D.
+    """
+    id: str = Field(default_factory=_new_id)
+    case_id: str
+    event_type: EventType
+    effective_date: date  # the date the change is in effect from the case's perspective
+    recorded_at: datetime = Field(default_factory=_utcnow)  # the timestamp of capture
+    actor: str = "citizen"  # "citizen" | "officer:<id>"
+    payload: dict = Field(default_factory=dict)
+    note: str = ""
 
 
 # ---------------------------------------------------------------------------

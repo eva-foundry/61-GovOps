@@ -197,6 +197,100 @@
         }
       }
     },
+    "/api/cases/{case_id}/events": {
+      "post": {
+        "summary": "Post Case Event",
+        "description": "Record a life event and (by default) re-evaluate the case.\n\nPer ADR-013, events are append-only. The event is always saved; if\n``reevaluate=true`` (default) the engine runs against the case as it\nstands after applying every event in chronological order, with the\nnew recommendation linking back to the previous one via supersedes.",
+        "operationId": "post_case_event_api_cases__case_id__events_post",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          },
+          {
+            "name": "reevaluate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Reevaluate"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaseEventRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List Case Events",
+        "description": "Return the case's event log + recommendation history (supersession chain).\n\nBoth lists are returned in chronological order. The supersession chain\ncan be reconstructed client-side by following ``recommendation.supersedes``\nbackwards through the history list.",
+        "operationId": "list_case_events_api_cases__case_id__events_get",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Case Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cases/{case_id}/review": {
       "post": {
         "summary": "Review Case",
@@ -1424,6 +1518,40 @@
         ],
         "title": "ApproveRequest"
       },
+      "CaseEventRequest": {
+        "properties": {
+          "event_type": {
+            "$ref": "#/components/schemas/EventType"
+          },
+          "effective_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Effective Date"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload",
+            "default": {}
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor",
+            "default": "citizen"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_type",
+          "effective_date"
+        ],
+        "title": "CaseEventRequest"
+      },
       "CreateConfigValueRequest": {
         "properties": {
           "domain": {
@@ -1529,6 +1657,16 @@
           "escalate"
         ],
         "title": "DecisionOutcome"
+      },
+      "EventType": {
+        "type": "string",
+        "enum": [
+          "move_country",
+          "change_legal_status",
+          "add_evidence",
+          "re_evaluate"
+        ],
+        "title": "EventType"
       },
       "HTTPValidationError": {
         "properties": {
