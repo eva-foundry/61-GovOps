@@ -57,6 +57,42 @@
             }
           }
         }
+      },
+      "get": {
+        "summary": "Get Jurisdiction",
+        "description": "Public jurisdiction metadata for the citizen-facing /screen route.\n\nPer govops-022 the response carries a ``howto_url`` field resolved\nthrough the substrate (key ``jurisdiction.<code>.howto_url`` scoped\nto the jurisdiction's substrate id, e.g. ``ca-oas``). Missing record\n→ ``howto_url: null`` (the UI falls back to its preview-mode table).",
+        "operationId": "get_jurisdiction_api_jurisdiction__jur_code__get",
+        "parameters": [
+          {
+            "name": "jur_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jur Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/authority-chain": {
