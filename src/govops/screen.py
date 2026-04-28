@@ -18,7 +18,7 @@ determination, and every response carries that disclaimer in
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator

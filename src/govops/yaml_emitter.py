@@ -28,7 +28,6 @@ from typing import Any
 import yaml
 
 from govops.encoder import EncodingBatch, ProposalStatus
-from govops.models import LegalRule
 
 
 class EmissionError(ValueError):

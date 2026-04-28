@@ -7,7 +7,7 @@ invariants explicitly.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,7 +17,6 @@ from govops.screen import (
     ScreenEvidence,
     ScreenRequest,
     ScreenResidencyPeriod,
-    ScreenResponse,
     UnknownJurisdiction,
     run_screen,
 )

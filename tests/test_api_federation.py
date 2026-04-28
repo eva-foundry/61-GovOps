@@ -11,7 +11,6 @@ Coverage:
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -186,7 +185,6 @@ class TestFetchEndpoint:
 
     def test_unsigned_without_allow_returns_400(self, client, lawcode_sandbox, monkeypatch):
         # Stub HTTP loaders so the test doesn't make a real request.
-        from govops import api as api_module
         from govops import federation as fed
         sample_files = {"lawcode/jp/config/rules.yaml": b"values: []\n"}
         manifest = FederationManifest(

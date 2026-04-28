@@ -20,8 +20,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Optional
 
 from cryptography.exceptions import InvalidSignature
@@ -47,6 +48,54 @@ class FederationError(ValueError):
 
 class UntrustedPublisher(FederationError):
     """The manifest's publisher_id is not in the trust allowlist."""
+
+
+class UnsafePath(FederationError):
+    """A publisher_id or manifest file path tried to escape its sandbox.
+
+    Defense in depth: even though publishers are allowlisted and manifests
+    are signed, a trusted-but-compromised publisher could craft a manifest
+    with `../` traversal or absolute paths to write outside the federated
+    cache directory. Both `publisher_id` and every `files[].path` are
+    validated against this guard before any filesystem operation.
+    """
+
+
+# Allowed publisher_id format: lowercase ASCII alphanumeric plus `-` / `_`,
+# starting with alphanumeric. No path separators, no parent-traversal, no
+# whitespace, no leading dots. Mirrors the convention used in
+# lawcode/REGISTRY.yaml and prevents `../`, absolute paths, drive letters,
+# and Windows reserved names from reaching pathlib joins.
+_PUBLISHER_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+
+
+def _safe_publisher_id(pid: str) -> str:
+    """Validate publisher_id is safe to use as a directory name. Raises UnsafePath if not."""
+    if not isinstance(pid, str) or not _PUBLISHER_ID_RE.match(pid):
+        raise UnsafePath(f"unsafe publisher_id: {pid!r}")
+    return pid
+
+
+def _safe_relative_path(p: str) -> str:
+    """Validate a manifest file path stays inside its pack directory.
+
+    Rejects absolute paths, parent-traversal segments, and Windows-style
+    drive letters. Manifests are signed, but a compromised trusted publisher
+    could still publish a malicious path; this guard refuses to write
+    anywhere except inside the pack directory.
+    """
+    if not isinstance(p, str) or not p:
+        raise UnsafePath(f"unsafe manifest path: {p!r}")
+    # Use PurePosixPath so manifest paths are evaluated with POSIX semantics
+    # regardless of the host OS. Reject absolute, parent traversal, and any
+    # Windows-style drive root (e.g. "C:\foo") that pathlib doesn't catch on
+    # POSIX hosts.
+    if "\\" in p or ":" in p:
+        raise UnsafePath(f"unsafe manifest path: {p!r}")
+    pp = PurePosixPath(p)
+    if pp.is_absolute() or any(part in ("..", "") for part in pp.parts):
+        raise UnsafePath(f"unsafe manifest path: {p!r}")
+    return p
 
 
 class SignatureMismatch(FederationError):
@@ -277,10 +326,25 @@ def fetch_pack(
     written: list[str] = []
 
     if not dry_run:
-        pack_dir = target_dir / publisher_id
+        # Defense-in-depth: validate publisher_id and every manifest file
+        # path before they reach the filesystem. The trust allowlist + signed
+        # manifest are the primary gates, but a compromised trusted publisher
+        # could still craft `../` traversal or absolute paths; these guards
+        # close that window. Raises UnsafePath on violation (caller maps to
+        # 4xx).
+        safe_pub = _safe_publisher_id(publisher_id)
+        pack_dir = target_dir / safe_pub
         pack_dir.mkdir(parents=True, exist_ok=True)
         for path, data in file_bytes_by_path.items():
-            out_path = pack_dir / path
+            safe_path = _safe_relative_path(path)
+            out_path = pack_dir / safe_path
+            # Belt-and-braces: even with PurePosixPath validation, confirm
+            # the resolved path stays inside pack_dir. Catches edge cases
+            # like symlinks pointing outside the cache.
+            try:
+                out_path.resolve().relative_to(pack_dir.resolve())
+            except ValueError:
+                raise UnsafePath(f"resolved path escapes pack dir: {out_path}")
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(data)
             written.append(str(out_path.relative_to(target_dir)))
@@ -296,6 +360,10 @@ def fetch_pack(
             "signed": signed,
             "files": [{"path": f.path, "sha256": f.sha256} for f in manifest.files],
         }
+        # `.provenance.json` is a fixed literal name, not user-controlled, so
+        # the path-injection concern doesn't apply here — but pack_dir was
+        # built from validated `safe_pub` above, which is what the rule was
+        # ultimately tracking.
         (pack_dir / ".provenance.json").write_text(
             json.dumps(provenance, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
@@ -407,9 +475,11 @@ def set_pack_enabled(federated_dir: Path, publisher_id: str, enabled: bool) -> b
 
     Returns True if the state changed; False if it was already in the
     requested state. Raises ``FileNotFoundError`` if the pack doesn't
-    exist (the caller should map this to a 404).
+    exist (the caller should map this to a 404). Raises ``UnsafePath`` if
+    publisher_id contains traversal patterns (the caller should map to 4xx).
     """
-    pack_dir = federated_dir / publisher_id
+    safe_pub = _safe_publisher_id(publisher_id)
+    pack_dir = federated_dir / safe_pub
     if not pack_dir.exists() or not pack_dir.is_dir():
         raise FileNotFoundError(f"pack {publisher_id!r} not found in {federated_dir}")
     sentinel = pack_dir / ".disabled"
