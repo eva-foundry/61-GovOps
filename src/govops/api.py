@@ -237,6 +237,50 @@ def switch_jurisdiction(jur_code: str):
     return {"jurisdiction": jur_code, "name": pack.jurisdiction.name, "program": pack.program_name}
 
 
+# Mirrors `legacy_constants._JURISDICTION_PREFIX_TO_ID`. Imported lazily to
+# avoid a circular import at module load (legacy_constants pulls config which
+# pulls api in some test setups).
+_JUR_PREFIX_TO_SUBSTRATE_ID = {
+    "ca": "ca-oas",
+    "br": "br-inss",
+    "es": "es-jub",
+    "fr": "fr-cnav",
+    "de": "de-drv",
+    "ua": "ua-pfu",
+}
+
+
+@app.get("/api/jurisdiction/{jur_code}")
+def get_jurisdiction(jur_code: str):
+    """Public jurisdiction metadata for the citizen-facing /screen route.
+
+    Per govops-022 the response carries a ``howto_url`` field resolved
+    through the substrate (key ``jurisdiction.<code>.howto_url`` scoped
+    to the jurisdiction's substrate id, e.g. ``ca-oas``). Missing record
+    → ``howto_url: null`` (the UI falls back to its preview-mode table).
+    """
+    if jur_code not in JURISDICTION_REGISTRY:
+        raise HTTPException(404, f"Unknown jurisdiction: {jur_code}. Available: {list(JURISDICTION_REGISTRY.keys())}")
+    pack = JURISDICTION_REGISTRY[jur_code]
+    substrate_id = _JUR_PREFIX_TO_SUBSTRATE_ID.get(jur_code)
+    howto_url: str | None = None
+    if substrate_id is not None:
+        cv = config_store.resolve(
+            f"jurisdiction.{jur_code}.howto_url",
+            evaluation_date=datetime.now(timezone.utc),
+            jurisdiction_id=substrate_id,
+        )
+        if cv is not None and isinstance(cv.value, str) and cv.value:
+            howto_url = cv.value
+    return {
+        "id": pack.jurisdiction.id,
+        "jurisdiction_label": pack.jurisdiction.name,
+        "program_name": pack.program_name,
+        "default_language": pack.default_language,
+        "howto_url": howto_url,
+    }
+
+
 @app.get("/api/authority-chain")
 def get_authority_chain():
     jur_code = _current_jur_code()
