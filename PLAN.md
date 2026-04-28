@@ -250,7 +250,7 @@ Sequenced; each sub-phase ships independently.
 | 10C | ~130 | ⬜ | notification artefact templating |
 | 10D | ~145 | ⬜ | life-event reassessment |
 
-**Live count (2026-04-28)**: 343 backend tests passing (`pytest -q`).
+**Live count (2026-04-28)**: 375 backend tests passing (`pytest -q`). Delta from 343 → 375 covers the v0.3.0 federation + admin work (343 → 366), the govops-022 backend prelude (366 → 373, +7 in `tests/test_api_jurisdiction_howto.py`), and the 7th-jurisdiction integration (373 → 375, +2 in `tests/test_api.py::TestMultiJurisdiction`).
 
 Tests must stay green at every phase exit. CI matrix stays at Python 3.10/3.11/3.12.
 
@@ -258,7 +258,7 @@ Tests must stay green at every phase exit. CI matrix stays at Python 3.10/3.11/3
 
 ## 7. Non-goals (preserved from v2.0 vision)
 
-- No new jurisdictions during Phases 1–3 (doubles migration cost). Defer until Phase 3 exit.
+- ~~No new jurisdictions during Phases 1–3 (doubles migration cost). Defer until Phase 3 exit.~~ **LIFTED 2026-04-28** by the addition of Japan (`jp`) as the 7th jurisdiction. The freeze served its purpose: Phases 1–6 landed without re-encoding seed data per migration step. With the substrate stable from Phase 3 exit and the schema-validated YAML loader doing the load-bearing work, adding `lawcode/jp/config/rules.yaml` + `jurisdiction.yaml` (15 ConfigValue records) and a Japan section in `src/govops/jurisdictions.py` (jurisdiction + authority chain + 5 LegalRules + 4 demo cases) cost zero changes to existing tests and proved success criterion #2 ("contributable in YAML by a non-Python developer") for a country whose statutory text is in a non-Latin script.
 - No **production** persistence layer (managed PostgreSQL with HA, backup, ops on-call). The post-Phase-10 "storage track" refers to that. **Embedded SQLite** beside the code is used from Phase 6 onward per [ADR-010](docs/design/ADRs/ADR-010-sqlite-from-phase-6.md) — it is a local file, not infrastructure, and preserves the "clone, install, run" demo principle.
 - No authentication or RBAC during structural work.
 - No new rule types beyond `RuleType.CALCULATION` (added in Phase 10B).
