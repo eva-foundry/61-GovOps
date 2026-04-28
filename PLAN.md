@@ -437,6 +437,24 @@ Originating spec: [docs/govops-020-admin-federation.md](docs/govops-020-admin-fe
 
 **Cumulative test-budget impact for Phase 8**: 17 federation-substrate tests (`test_federation.py`) + 14 admin-HTTP tests (`test_api_federation.py`) = 31 tests for the federation pipeline end-to-end.
 
+### Phase 12 — follow-up specs queued (2026-04-28)
+
+Three small Lovable specs queued behind the v0.3.0 → v0.4.0 cut. Each
+addresses a previously-tracked follow-up row above (PLAN §12 7.x.8 /
+8.x.3 / 10A.x.9) — written now so the next Lovable batch can pick them
+up without context reconstruction. None are ship-blockers; all three
+are hygiene/consistency improvements over surfaces already in main.
+
+| # | Spec | Originating row | Status |
+| --- | --- | --- | --- |
+| 12.x.1 | [docs/govops-021-mock-federation-cleanup.md](docs/govops-021-mock-federation-cleanup.md) — drop `web/src/lib/mock-federation.ts` and the four `try { fetcher } catch { mockX }` fallback branches in `web/src/lib/api.ts` now that `/api/admin/federation/*` is live. Pure cleanup; no UX change | 8.x.3 | Spec written, awaiting Lovable batch |
+| 12.x.2 | [docs/govops-022-howto-url-as-configvalue.md](docs/govops-022-howto-url-as-configvalue.md) — move per-jurisdiction "How to apply" URL out of `HOWTO_URLS` in `ScreenResult.tsx` and into the substrate as `jurisdiction.<code>.howto_url` ConfigValues. Backend prelude (GET `/api/jurisdiction/{code}` exposing `howto_url`, six seed records, 7 tests) ships separately as a non-Lovable commit; the Lovable side reads the field with a fallback to today's table for preview parity | 10A.x.9 | Spec written; backend prelude ships in a separate commit |
+| 12.x.3 | [docs/govops-023-ssr-head-coverage.md](docs/govops-023-ssr-head-coverage.md) — convert hardcoded English `head()` titles + descriptions on `/config`, `/authority`, `/encode` (and any sibling Phase 6 route still emitting hardcoded English) to use the same i18n catalog the page bodies use, via a small `web/src/lib/head-i18n.ts` helper that reads `govops-locale`. Adds a non-empty `<title>` smoke assertion per route. **No new i18n keys**; if audit shows a needed key is missing, the Lovable agent stops and requests it | 7.x.8 | Spec written, awaiting Lovable batch |
+
+These three specs are intentionally small. The cumulative work is
+~1 day of Lovable bandwidth across all three. Backend test-budget
+impact: +7 tests for the govops-022 prelude (`tests/test_api_jurisdiction_howto.py`).
+
 ### Convention going forward
 
 When Lovable (or any contributor) ships beyond a spec and the addition is accepted on merit:
