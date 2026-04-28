@@ -30,6 +30,7 @@ Each ADR follows this structure:
 | 010 | [SQLite-backed ConfigStore from Phase 6](ADR-010-sqlite-from-phase-6.md) | Accepted | v2.0 / Gate 3 (revised) |
 | 011 | [Calculation rules as typed AST in YAML](ADR-011-calculation-rules-as-typed-ast.md) | Accepted | v2.0 / Phase 10B |
 | 012 | [Notice rendering: derived artefact, template-as-ConfigValue](ADR-012-notice-rendering.md) | Accepted | v2.0 / Phase 10C |
+| 013 | [Event-driven reassessment with supersession chain](ADR-013-event-driven-reassessment.md) | Accepted | v2.0 / Phase 10D |
 
 ## Contributing ADRs
 

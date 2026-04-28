@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from govops.config import (
     ApprovalStatus,
@@ -37,7 +37,9 @@ from govops.engine import OASEngine
 from govops.i18n import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, get_translator
 from govops.jurisdictions import JURISDICTION_REGISTRY
 from govops.models import (
+    CaseEvent,
     DecisionOutcome,
+    EventType,
     HumanReviewAction,
     ReviewAction,
 )
@@ -291,8 +293,102 @@ def evaluate_case(case_id: str):
         raise HTTPException(404, f"Case {case_id} not found")
     engine = OASEngine(rules=list(store.rules.values()))
     rec, audit = engine.evaluate(case)
+    # Link to the prior recommendation if any (ADR-013 supersession chain).
+    prior = store.recommendations.get(case_id)
+    if prior is not None:
+        rec.supersedes = prior.id
     store.save_recommendation(rec, audit)
     return {"recommendation": rec}
+
+
+# ---------------------------------------------------------------------------
+# Life events (Phase 10D / ADR-013)
+# ---------------------------------------------------------------------------
+
+
+class CaseEventRequest(BaseModel):
+    event_type: EventType
+    effective_date: date
+    payload: dict = {}
+    actor: str = "citizen"
+    note: str = ""
+
+
+@app.post("/api/cases/{case_id}/events")
+def post_case_event(case_id: str, body: CaseEventRequest, reevaluate: bool = True):
+    """Record a life event and (by default) re-evaluate the case.
+
+    Per ADR-013, events are append-only. The event is always saved; if
+    ``reevaluate=true`` (default) the engine runs against the case as it
+    stands after applying every event in chronological order, with the
+    new recommendation linking back to the previous one via supersedes.
+    """
+    from govops.events import EventApplicationError, replay_events
+
+    case = store.get_case(case_id)
+    if not case:
+        raise HTTPException(404, f"Case {case_id} not found")
+
+    event = CaseEvent(
+        case_id=case_id,
+        event_type=body.event_type,
+        effective_date=body.effective_date,
+        actor=body.actor,
+        payload=body.payload,
+        note=body.note,
+    )
+
+    # Validate the payload by attempting to apply the event in isolation
+    # before persisting it. A bad payload (missing required field) becomes
+    # a 400 instead of a half-recorded state.
+    from govops.events import apply_event  # local import to avoid cycle
+    try:
+        apply_event(case, event)
+    except EventApplicationError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    store.save_event(event)
+
+    response: dict = {"event": event}
+
+    if reevaluate:
+        # Replay all events (including the one we just saved) onto the base
+        # case to get the projected state as-of the latest event date.
+        events = list(store.case_events.get(case_id, []))
+        as_of = max(e.effective_date for e in events) if events else event.effective_date
+        projected = replay_events(case, events, as_of=as_of)
+
+        engine = OASEngine(rules=list(store.rules.values()), evaluation_date=as_of)
+        rec, audit = engine.evaluate(projected)
+
+        prior = store.recommendations.get(case_id)
+        if prior is not None:
+            rec.supersedes = prior.id
+        rec.evaluation_date = as_of
+        rec.triggered_by_event_id = event.id
+
+        store.save_recommendation(rec, audit)
+        response["recommendation"] = rec
+
+    return response
+
+
+@app.get("/api/cases/{case_id}/events")
+def list_case_events(case_id: str):
+    """Return the case's event log + recommendation history (supersession chain).
+
+    Both lists are returned in chronological order. The supersession chain
+    can be reconstructed client-side by following ``recommendation.supersedes``
+    backwards through the history list.
+    """
+    if case_id not in store.cases:
+        raise HTTPException(404, f"Case {case_id} not found")
+    events = list(store.case_events.get(case_id, []))
+    history = list(store.recommendation_history.get(case_id, []))
+    return {
+        "events": events,
+        "recommendations": history,
+    }
 
 
 class ReviewRequest(BaseModel):

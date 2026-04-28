@@ -11,6 +11,7 @@ from govops.models import (
     AuditPackage,
     AuthorityReference,
     CaseBundle,
+    CaseEvent,
     CaseStatus,
     HumanReviewAction,
     Jurisdiction,
@@ -27,9 +28,14 @@ class DemoStore:
         self.legal_documents: dict[str, LegalDocument] = {}
         self.rules: dict[str, LegalRule] = {}
         self.cases: dict[str, CaseBundle] = {}
+        # Latest recommendation per case (for fast reads). Phase 10D adds
+        # `recommendation_history` so the supersession chain is queryable.
         self.recommendations: dict[str, Recommendation] = {}  # keyed by case_id
+        self.recommendation_history: dict[str, list[Recommendation]] = {}  # keyed by case_id
         self.review_actions: dict[str, list[HumanReviewAction]] = {}  # keyed by case_id
         self.audit_trails: dict[str, list[AuditEntry]] = {}  # keyed by case_id
+        # Phase 10D — append-only event log per case.
+        self.case_events: dict[str, list[CaseEvent]] = {}  # keyed by case_id
 
     def seed(
         self,
@@ -46,8 +52,10 @@ class DemoStore:
         self.rules = {}
         self.cases = {}
         self.recommendations = {}
+        self.recommendation_history = {}
         self.review_actions = {}
         self.audit_trails = {}
+        self.case_events = {}
 
         self.jurisdictions[jurisdiction.id] = jurisdiction
         self.authority_chain = list(authority_chain)
@@ -70,10 +78,37 @@ class DemoStore:
 
     def save_recommendation(self, rec: Recommendation, audit: list[AuditEntry]):
         self.recommendations[rec.case_id] = rec
+        # Append to the history chain — preserves all prior recommendations
+        # so the supersession trail is queryable even after multiple
+        # reassessments. Latest in `recommendations`, full chain in
+        # `recommendation_history`.
+        self.recommendation_history.setdefault(rec.case_id, []).append(rec)
         case = self.cases.get(rec.case_id)
         if case:
             case.status = CaseStatus.RECOMMENDATION_READY
         self.audit_trails.setdefault(rec.case_id, []).extend(audit)
+
+    def save_event(self, event: CaseEvent) -> None:
+        """Append a life event to the case's event log.
+
+        Per ADR-013, events are append-only: there is no edit, no delete.
+        Corrections are new events with an explicit ``supersedes_event_id``
+        in the payload.
+        """
+        self.case_events.setdefault(event.case_id, []).append(event)
+        self.audit_trails.setdefault(event.case_id, []).append(
+            AuditEntry(
+                event_type="case_event_recorded",
+                actor=event.actor,
+                detail=f"{event.event_type.value} effective {event.effective_date.isoformat()}",
+                data={
+                    "event_id": event.id,
+                    "event_type": event.event_type.value,
+                    "effective_date": event.effective_date.isoformat(),
+                    "payload": event.payload,
+                },
+            )
+        )
 
     def save_review(self, review: HumanReviewAction):
         self.review_actions.setdefault(review.case_id, []).append(review)
