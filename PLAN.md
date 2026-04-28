@@ -346,9 +346,9 @@ Originating spec: [docs/govops-015-self-screening.md](docs/govops-015-self-scree
 
 | # | Item | Status | Follow-up |
 | --- | --- | --- | --- |
-| 10A.x.0 | **Privacy regression**: `src/lib/screenDraft.ts` writes the full form state (DOB, residency, legal status, evidence) to `sessionStorage` on every keystroke; restored on mount. The `screen.lede` copy ("nothing is saved") is now factually false. Violates the load-bearing privacy invariant in govops-015 ("All state is in-memory React state. The only browser storage allowed is the existing locale cookie"). | **🚫 BLOCKING** — must ship before any SPRIND-facing surface | **Lovable**: see [docs/govops-015b-screen-privacy-fix.md](docs/govops-015b-screen-privacy-fix.md). Delete `screenDraft.ts` + the `useEffect` calls in `ScreenForm.tsx`; drop the `screen.draft.*` and `screen.reset.*` keys (or repurpose the dialog as in-memory clear). Keep the validation summary, dialog component, pure validator. |
+| 10A.x.0 | **Privacy regression**: `src/lib/screenDraft.ts` writes the full form state (DOB, residency, legal status, evidence) to `sessionStorage` on every keystroke; restored on mount. The `screen.lede` copy ("nothing is saved") is now factually false. Violates the load-bearing privacy invariant in govops-015 ("All state is in-memory React state. The only browser storage allowed is the existing locale cookie"). | ✅ closed (2026-04-28) — `screenDraft.ts` deleted in `eva-foundry/user-insights-hub@main`; only `screenValidation.ts` + `mock-screen.ts` remain in `src/lib/`. The `screen.draft.*` keys were dropped from all 6 locales and `screen.lede` is truthful again. | None — invariant held. Backend privacy tests in `tests/test_screen.py` already assert no PII echoed; complementary Playwright assertion `expect(screenKeys).toEqual([])` shipped via 015b. |
 | 10A.x.1 | Polish gap: inline `role="alert"` validation messages with `aria-describedby` + `aria-invalid` + top-of-form summary with focus-jump links. Pure validator extracted to `src/lib/screenValidation.ts`. | ✅ closed (post-flight) | None |
-| 10A.x.2 | Polish gap: program name + lede still hardcoded in `PROGRAM_LABELS` table inside `screen.$jurisdictionId.tsx`. `fetchJurisdiction()` exists in `api.ts` but is not called by this route. Spec required live fetch from `/api/jurisdiction/{code}`. | 🟡 still open | **Lovable**: see [docs/govops-015a-self-screening-polish.md](docs/govops-015a-self-screening-polish.md). Wire `fetchJurisdiction()` into the route loader; fall back to the existing hardcoded labels on network failure (preview-mode parity). |
+| 10A.x.2 | Polish gap: program name + lede still hardcoded in `PROGRAM_LABELS` table inside `screen.$jurisdictionId.tsx`. `fetchJurisdiction()` exists in `api.ts` but is not called by this route. Spec required live fetch from `/api/jurisdiction/{code}`. | ✅ closed (2026-04-28) — `screen.$jurisdictionId.tsx` route loader now calls `fetchJurisdiction(code)` with try/catch fallback to `PROGRAM_LABELS`; preview-mode badge on fallback. | None |
 | 10A.x.3 | Polish gap: mojibake in `en.json` (em-dash + middle-dot were `â€”` / `Â·`). Re-encoded to U+2014 / U+00B7. | ✅ closed (post-flight) | None |
 | 10A.x.4 | `LanguageSwitcher` in citizen shell header (`ScreenShell.tsx`) | Shipped | None |
 | 10A.x.5 | Esc on the result card returns focus to the first form field (`#screen-dob`) | Shipped | None |
@@ -359,10 +359,68 @@ Originating spec: [docs/govops-015-self-screening.md](docs/govops-015-self-scree
 | 10A.x.10 | Per-rule `detail` text rendered above citation in result rows | Shipped | None — already in the contract |
 | 10A.x.11 | Per-row "Remove" button on residency periods with `aria-label` | Shipped — accessibility upgrade | None |
 | 10A.x.12 | Validation summary panel at form top (post-flight) — ICU plural heading (`screen.errors.summary.heading`), clickable links that scroll+focus the offending field, trims to 5 with "and N more" | Shipped (post-flight) | None — strict improvement |
-| 10A.x.13 | Reset confirmation `<Dialog>` with i18n keys `screen.reset.{title,body,keep,discard}` (post-flight) | Shipped, **but tied to draft persistence** | After 10A.x.0 fix: repurpose as plain in-memory clear (drop `screen.reset.*` if dialog goes too) |
-| 10A.x.14 | Versioned snapshot + migration pipeline in `screenDraft.ts` (v1→v2) with retry-on-quota-failure backoff (post-flight) | **🚫 will be deleted** as part of 10A.x.0 | Removed when `screenDraft.ts` is dropped |
+| 10A.x.13 | ~~Reset confirmation `<Dialog>` with i18n keys `screen.reset.{title,body,keep,discard}` (post-flight)~~ | ✅ closed (2026-04-28) — moot after 10A.x.0; with no draft persistence there is nothing to confirm-discard. The `screen.reset.*` keys were dropped from all 6 locales as part of 015b. | None |
+| 10A.x.14 | ~~Versioned snapshot + migration pipeline in `screenDraft.ts` (v1→v2) with retry-on-quota-failure backoff (post-flight)~~ | ✅ closed (2026-04-28) — deleted as part of 015b. The privacy invariant doesn't need a migration pipeline. | None |
+| 10A.x.15 | Route-loader `pendingComponent` skeleton (`ScreenFormSkeleton`) with `prefers-reduced-motion` respect (no shimmer when reduced-motion is set). Shipped alongside 015a's `fetchJurisdiction()` wiring. | Shipped (2026-04-28) | None — strict UX improvement |
+| 10A.x.16 | `RouteError` boundary on screen routes — graceful degradation when `fetchJurisdiction()` fails or the route loader throws. | Shipped (2026-04-28) | None |
+| 10A.x.17 | Focus management on validation: clickable summary links scroll-and-focus the offending field; submit-with-errors moves focus to the summary heading. | Shipped (2026-04-28) | None — accessibility upgrade |
+| 10A.x.18 | Playwright assertion that `Object.keys(sessionStorage).filter(k => k.startsWith("screen.draft")).length === 0` after a form submission (privacy invariant test). | Shipped (2026-04-28) — assertion exceeds spec by checking the strong-empty form `expect(screenKeys).toEqual([])`. | None |
 
-**Cumulative test-budget impact for Phase 10A**: backend already has 18 privacy + happy-path tests (landed in this session). Lovable post-flight pass added unit tests for the pure validator (count TBD). Once 10A.x.0 lands, the privacy invariants will need explicit Playwright cases asserting `sessionStorage.getItem("govops:screen-draft") === null` after a form submission.
+**Cumulative test-budget impact for Phase 10A**: backend has 18 privacy + happy-path tests in `tests/test_screen.py`, plus 7 benefit-amount tests added in Phase 10B. Lovable post-flight pass added unit tests for the pure validator + the privacy-invariant Playwright case from 10A.x.18. All originally-blocking items closed.
+
+### Phase 9 — About-rebuild + REPO_BASE finalization (2026-04-26 → 2026-04-28)
+
+Originating specs: [docs/govops-016-about-rebuild.md](docs/govops-016-about-rebuild.md), [docs/govops-016a-repo-base-finalization.md](docs/govops-016a-repo-base-finalization.md). The about page is GovOps's peer-grade artefact: SPRIND framing, Agentic State citation, Law-as-Code five-element mapping, jurisdiction-first authority chain, FKTE pipeline, operating principles, "what this is not", and the read-deeper block linking back to in-repo artefacts.
+
+| # | Item | Status | Follow-up |
+| --- | --- | --- | --- |
+| 9.x.1 | Page-local `InRepoAnchor` and `ExternalAnchor` helpers in `about.tsx` (instead of importing a shared component) — keeps the page self-contained, makes it easy to read end-to-end. | Shipped (2026-04-26) | If a third route needs the same affordance, hoist to `src/components/govops/`. Cosmetic until then. |
+| 9.x.2 | Curly typographic quotes (U+2018 / U+2019 / U+201C / U+201D) in body copy across all 6 locales. | Shipped (2026-04-26) | None — strict polish |
+| 9.x.3 | Localized dates in attribution lines (e.g. "Tallinn 2025") use locale-aware formatting via `Intl.DateTimeFormat` rather than hardcoded year strings. | Shipped (2026-04-26) | None |
+| 9.x.4 | All in-repo links open in a new tab (`target="_blank" rel="noopener"`) so a SPRIND-network reader following one reference doesn't lose the about page. | Shipped (2026-04-26) | None |
+| 9.x.5 | govops-016a — `REPO_BASE` defaulted to `https://github.com/eva-foundry/61-GovOps/blob/main`, new `PROJECT_HOME` constant defaulted to `https://eva-foundry.github.io/61-GovOps/`, both env-overridable; §10 prepends a "Project home" `ReferenceCard` opening in a new tab; §1 masthead exposes a "GitHub Pages" CTA next to the existing GitHub repo CTA. Three new i18n keys × 6 locales. | Shipped (2026-04-28) | None — every in-repo §10 link now resolves to a real file in `eva-foundry/61-GovOps@main`. |
+
+### Phase 10B — Lovable extras accepted (2026-04-28)
+
+Originating spec: [docs/govops-017-benefit-amount-card.md](docs/govops-017-benefit-amount-card.md). The card is a passive renderer over the backend's `benefit_amount` shape — no client-side rendering, no estimation, no override UI.
+
+| # | Item | Status | Follow-up |
+| --- | --- | --- | --- |
+| 10B.x.1 | `BenefitAmountCard` component renders the projected amount + currency + period + i18n-aware "How is this calculated?" disclosure walking the formula trace step-by-step with citations. | Shipped (2026-04-28) — present in `src/components/govops/screen/BenefitAmountCard.tsx`, consumed inside `ScreenResult.tsx` for `/screen/$jurisdictionId` and inside `cases.$caseId.tsx` for the case-detail panel. | None — the component is read-only over the existing API, no contract surface to maintain. |
+| 10B.x.2 | 20 new i18n keys × 6 locales (operator labels for every formula op + period/type/heading text). Parity verified: 116 entries match the new key prefixes per locale. | Shipped (2026-04-28) | None |
+
+### Phase 10C — Lovable extras accepted (2026-04-28)
+
+Originating spec: [docs/govops-018-download-decision-notice.md](docs/govops-018-download-decision-notice.md). The "Download decision" CTA opens the rendered HTML in a new tab — no Blob URLs, no client-side rendering, no localStorage; citizens use their browser's print-to-PDF for portable storage.
+
+| # | Item | Status | Follow-up |
+| --- | --- | --- | --- |
+| 10C.x.1 | `DownloadDecisionButton` component with `mode="case"` and `mode="screen"` driving the existing `GET /api/cases/{id}/notice` and `POST /api/screen/notice` endpoints respectively. | Shipped (2026-04-28) — present in `src/components/govops/notices/DownloadDecisionButton.tsx`, consumed in both `screen.$jurisdictionId.tsx` and `cases.$caseId.tsx`. | None |
+| 10C.x.2 | Four new i18n keys × 6 locales (`screen.download.cta` / `.in_progress` / `.error` / `.tooltip`). | Shipped (2026-04-28) | None |
+| 10C.x.3 | PDF rendering deferred per ADR-012. The HTML notice is the load-bearing artefact; PDF binding choice (WeasyPrint, xhtml2pdf, headless Chrome) gets its own ADR when the demand surfaces. | Deferred by design — not a follow-up | When ready: separate ADR + dependency call (Windows pain on WeasyPrint is a real factor). |
+
+### Phase 10D — Lovable extras accepted (2026-04-28)
+
+Originating spec: [docs/govops-019-case-event-timeline.md](docs/govops-019-case-event-timeline.md). The case-detail surface gains an event timeline + new-event form; the supersession chain renders as a stack of decisions tied to the events that triggered them.
+
+| # | Item | Status | Follow-up |
+| --- | --- | --- | --- |
+| 10D.x.1 | `EventTimeline` component renders one row per event in chronological order with type badge, payload summary, and a chip linking to the recommendation it triggered. | Shipped (2026-04-28) — present in `src/components/govops/cases/EventTimeline.tsx`, wired into `cases.$caseId.tsx`. | None |
+| 10D.x.2 | `NewEventForm` component (admin-gated `<Dialog>` with field set varying by `event_type`, react-hook-form + zod validation, error toasts on `4xx` / `5xx`). | Shipped (2026-04-28) — present in `src/components/govops/cases/NewEventForm.tsx`, wired into `cases.$caseId.tsx` via `<NewEventForm caseId={caseId} onCreated={handleEventCreated} />`. | None |
+| 10D.x.3 | Bonus: `PreviousDecisions` component renders the supersession chain as a stack of `<Collapsible>` sections — beyond the spec's "render the chip on each event" requirement. | Shipped (2026-04-28) — accepted on merit. The supersession chain is exactly the kind of audit-of-record affordance officers need; the collapsible stack is the right shape for it. | Update govops-019 §Acceptance to record `PreviousDecisions` as part of the shipped surface. |
+| 10D.x.4 | 14 new i18n keys × 6 locales (`events.heading`, `events.type.*`, `events.summary.*`, `events.history.previous_decision`, `events.form.*`). | Shipped (2026-04-28) | None |
+
+### Phase 8 — Lovable extras + admin federation surface (2026-04-28)
+
+Originating spec: [docs/govops-020-admin-federation.md](docs/govops-020-admin-federation.md). The admin federation route exposes registry + imported packs + fetch form. Trust-decision authoring stays as a YAML PR per ADR-009's stance.
+
+| # | Item | Status | Follow-up |
+| --- | --- | --- | --- |
+| 8.x.1 | `/admin/federation` route (`src/routes/admin.federation.tsx`, ~7.5 KB) with three sections: registered publishers, imported packs, fetch form. Trust chip per row from a `trust_state` field; signed/unsigned chip per imported pack; per-pack `Re-fetch` / `Disable` / `Enable` actions; allow-unsigned + dry-run flags on the fetch form. | Shipped (2026-04-28) | None |
+| 8.x.2 | i18n keys for the federation surface — 21 new keys × 6 locales covering section headings, trust states, signed states, action labels, form labels, allow-unsigned warning. | Shipped (2026-04-28) | None |
+| 8.x.3 | Backend admin endpoints powering the page: `GET /api/admin/federation/registry` (publishers + trust state), `GET /api/admin/federation/packs` (provenance + enabled), `POST /api/admin/federation/fetch/{publisher_id}?dry_run=&allow_unsigned=` (wraps `fetch_pack`, fail-closed errors → 4xx), `POST /api/admin/federation/packs/{publisher_id}/enabled` (toggle the `.disabled` sentinel). | Shipped (2026-04-28) — 14 new tests in `tests/test_api_federation.py`. | The Lovable-side mocks in `mock-federation.ts` can be removed in a follow-up commit; the page can drive directly against the real endpoints. |
+
+**Cumulative test-budget impact for Phase 8**: 17 federation-substrate tests (`test_federation.py`) + 14 admin-HTTP tests (`test_api_federation.py`) = 31 tests for the federation pipeline end-to-end.
 
 ### Convention going forward
 
