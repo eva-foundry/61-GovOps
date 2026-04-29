@@ -112,12 +112,52 @@ The demo implements a complete **Old Age Security (OAS) initial eligibility dete
 - **Explicit uncertainty**: missing or contradictory inputs trigger review, not false certainty
 - **Human accountability**: humans remain the final decision authorities
 
+### v2.0 substrate
+
+Law-as-Code v2.0 inserts a **dated `ConfigValue` substrate** between the formalized rules and the engine. Every parameter the engine touches — age thresholds, residency minima, accepted legal statuses, calculation coefficients, prompts, UI labels — is resolved through `ConfigStore.resolve(key, evaluation_date, jurisdiction_id)` rather than a hardcoded constant. A case evaluated against 2025 still resolves with 2025's substrate even after the rules change in 2026; the supersession chain is durable.
+
+```
+                                                        Federation (Phase 8)
+                                                     +--------------------------+
+                                                     | Ed25519 signed packs     |
+                                                     | publisher allowlist      |
+                                                     | lawcode/REGISTRY.yaml    |
+                                                     +-----------+--------------+
+                                                                 | (verified merge)
+                                                                 v
++------------------------+        +------------------------------+-----+
+| Formalized Rules       |  ref   |         ConfigValue Substrate      |
+| (param_key_prefix +    +------->+   (dated, citation, supersedes,   |
+|  citation only)        |        |    rationale, approved_by)        |
++-----------+------------+        +-----------+------------------------+
+            |                                 ^
+            | engine.evaluate(                | resolve(key,
+            |   case, evaluation_date)        |  evaluation_date)
+            v                                 |
++------------------------+        +-----------+------------------------+
+| Deterministic engine   +------->+ Audit package (full ConfigResolution
+| (rule + calculation)   |        | trace per rule, sha256 of notice  |
++------------------------+        | template, supersession chain)     |
+                                  +------------------------------------+
+```
+
+YAML lives under [lawcode/](lawcode/), validated against [schema/lawcode-v1.0.json](schema/lawcode-v1.0.json) on every push. The encoding pipeline (`govops encode`) emits commit-ready YAML, not Python.
+
 ### Technology:
 
-- **Python + FastAPI** backend (no infrastructure dependencies)
-- **Jinja2** templates (no JavaScript build step)
-- **In-memory store** seeded from statutory data (resets on restart)
-- **Pydantic** models for the full domain (jurisdiction, authority chain, rules, cases, evidence, audit)
+**Backend** (`src/govops/`):
+- **Python + FastAPI** with **Pydantic** models for the full domain (jurisdiction, authority chain, rules, cases, evidence, audit, ConfigValue)
+- **Embedded SQLite** at `var/govops.db` for `ConfigStore` persistence (Phase 6+ per [ADR-010](docs/design/ADRs/ADR-010-sqlite-from-phase-6.md)); legacy in-memory store retained for the case fixtures
+- **Schema-validated YAML** for every business value under [lawcode/](lawcode/) — 21 files, 564 records, validated in CI
+- **Ed25519** for federation (Phase 8) — signed lawcode packs with publisher allowlist per [ADR-009](docs/design/ADRs/)
+- **Jinja2** templates retained as a fallback rendering surface; the primary UI is the `web/` SPA below
+
+**Frontend** (`web/`):
+- **TanStack Start** (SSR + flat-route conventions) on **Vite** + **React 19** + **TypeScript**
+- **Tailwind v4** + **shadcn/ui** for design-system primitives
+- **react-intl** with ICU MessageFormat for 6 locales × ~498 keys; ICU + key-parity validators run as `prebuild`
+- **CodeMirror** + **react-diff-viewer-continued** for the ConfigValue admin surface; **react-hook-form** + **zod** for forms
+- **Playwright + axe** cross-browser E2E suite covering smoke, admin flow, approval actions, a11y (WCAG 2.1 AA), i18n, and SSR head coverage
 
 ---
 
@@ -160,17 +200,24 @@ The demo exposes both a web UI and a JSON API.
 | POST | `/api/admin/federation/packs/{publisher_id}/enable` | Enable a verified pack |
 | POST | `/api/admin/federation/packs/{publisher_id}/disable` | Disable a pack |
 
-### Web UI pages:
+### Web UI pages (TanStack Start SPA in `web/`, served at http://localhost:8080):
 
 | Path | Description |
 | --- | --- |
-| `/` | About page (what GovOps is, roadmap, honest assessment) |
-| `/cases` | Case dashboard |
+| `/` | Landing — Law-as-Code v2.0 hero, console dropdown into the operator surfaces |
+| `/about` | What GovOps is, SPRIND framing, FKTE pipeline, authority chain, "what this is not" |
+| `/cases` | Case dashboard with event timeline + benefit-amount card on case detail |
 | `/authority` | Authority chain browser |
-| `/encode` | Rule encoding pipeline (legislative text to rules) |
-| `/admin` | Glass window (all data behind the scenes) |
+| `/encode` | Rule encoding pipeline (legislative text → proposals → review → YAML emission) |
+| `/impact` | Citation impact across all jurisdictions (Phase 7) |
+| `/screen`, `/screen/:jurisdiction` | Citizen self-screening — no PII storage, no case row (Phase 10A) |
+| `/config` (+ `/timeline`, `/diff`, `/draft`, `/approvals`, `/prompts`) | ConfigValue admin (search, supersession, draft, dual approval, prompt management) |
+| `/admin` | Operator surface — seeded data, federation registry, runbook |
+| `/admin/federation` | Federation registry + signed pack management (Phase 8) |
+| `/walkthrough` | Guided tour of the substrate-as-truth flow |
+| `/policies` | Privacy + data handling notice |
 
-Interactive API docs: http://127.0.0.1:8000/docs
+The legacy Jinja UI (served at http://127.0.0.1:8000) is preserved as a no-build-step fallback covering `/`, `/cases`, `/authority`, `/encode`, `/admin`, `/mvp`. Interactive API docs: http://127.0.0.1:8000/docs
 
 ---
 
