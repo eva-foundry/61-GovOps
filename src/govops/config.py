@@ -569,10 +569,21 @@ class ConfigStore:
             disabled_pack_dirs = {
                 p.parent for p in target.rglob(".disabled") if p.is_file()
             }
+            # v3 (ADR-014, ADR-015) — `programs/` subdirs hold Program manifests
+            # with a different file shape (Program manifest, not ConfigValue
+            # list); `_shapes/` holds local shape declarations per ADR-015's
+            # two-tier model. Both are excluded from substrate hydration so the
+            # ConfigValue loader doesn't trip over them.
+            non_config_dir_names = {"programs", "_shapes"}
             files = []
             for fp in sorted(target.rglob("*.yaml")) + sorted(target.rglob("*.yml")):
                 # If any ancestor is a disabled pack directory, skip the file.
                 if any(parent in disabled_pack_dirs for parent in fp.parents):
+                    continue
+                # If any ancestor directory is a v3 non-config bucket, skip.
+                if any(
+                    parent.name in non_config_dir_names for parent in fp.parents
+                ):
                     continue
                 files.append(fp)
         else:
