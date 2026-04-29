@@ -35,18 +35,27 @@ For build history and accepted backlog: [`PLAN.md`](PLAN.md). For load-bearing d
 
 ## Quick Start
 
+GovOps v2.0 has **two surfaces** during local development. The modern v2 UI is what visitors see in the screenshots; the legacy Jinja UI is preserved as a no-build-step fallback.
+
 ```bash
 git clone https://github.com/agentic-state/GovOps-LaC.git
 cd GovOps-LaC
 pip install -e ".[dev]"
-govops-demo                    # Jinja UI + JSON API at http://127.0.0.1:8000
 ```
 
-For the modern web UI (Vite + TanStack + shadcn — 23 routes, 6 locales, the surface most contributors should use):
+**Start both surfaces** (two terminals, ~30s setup each):
 
 ```bash
+# Terminal 1 — backend API + legacy Jinja UI fallback
+govops-demo                            # http://127.0.0.1:8000
+
+# Terminal 2 — the v2 React/TanStack/shadcn UI (what's in the screenshots)
 cd web && npm install && npm run dev   # http://localhost:8080
 ```
+
+Open **http://localhost:8080** for the v2 experience (23 routes, 6 locales, parchment-on-ink theme). The Jinja UI at `:8000` is the v0 / v1 fallback retained for "no Node toolchain" demos and is clearly labelled as such.
+
+> **Coming in v2.1**: a single hosted demo URL collapses both surfaces into one process via Docker (FastAPI serves the built React SPA + the JSON API + an LLM proxy). See `memory/v2_1_hosted_demo_plan.md`.
 
 No database server, no cloud, no API keys. Embedded SQLite handles the substrate.
 
@@ -294,7 +303,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-396 backend tests covering (all green on Python 3.10/3.11/3.12):
+423 backend tests covering (all green on Python 3.10/3.11/3.12):
 - Rule engine unit tests (all decision paths, edge cases, residency calculation)
 - Determinism verification (identical inputs = identical outputs)
 - Authority traceability (every rule has a statutory citation)
