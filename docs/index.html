@@ -493,14 +493,14 @@
 
 <section id="proof">
   <div class="container">
-    <div class="section-eyebrow">Proof · Real captures, not mockups</div>
+    <div class="section-eyebrow">Proof · Real captures + clickable mock demo</div>
     <h2>See it working</h2>
-    <p class="section-lede">Screenshots below are PNGs captured by Playwright against the live v0.4.0 dev server (Vite + TanStack + shadcn, parchment-on-ink theme). Click any image to see it full-resolution.</p>
+    <p class="section-lede">PNGs captured by Playwright against the live v2 dev server (Vite + TanStack + shadcn, parchment-on-ink). <strong>Click any image to open a static mock demo of that page</strong> — interactivity is disabled in the snapshot; a real hosted live demo ships in v2.1 (≈1 week). Source PNGs are in <a href="screenshots/v2/" style="color:var(--lavender-700);">screenshots/v2/</a>.</p>
 
     <div class="gallery">
 
       <figure class="shot">
-        <a href="screenshots/v2/06-screen-ca.png"><img src="screenshots/v2/06-screen-ca.png" alt="Citizen self-screening form for Canada OAS — date of birth, legal status, country of birth, residency periods, evidence checkboxes." loading="lazy" width="1440" height="900"></a>
+        <a href="demo/v2/06-screen-ca.html"><img src="screenshots/v2/06-screen-ca.png" alt="Citizen self-screening form for Canada OAS — date of birth, legal status, country of birth, residency periods, evidence checkboxes." loading="lazy" width="1440" height="900"></a>
         <figcaption>
           <span class="ribbon">CITIZEN · NO PII STORED</span>
           <span class="title">Self-screening — /screen/&lt;jurisdiction&gt;</span>
@@ -509,7 +509,7 @@
       </figure>
 
       <figure class="shot">
-        <a href="screenshots/v2/09-config.png"><img src="screenshots/v2/09-config.png" alt="ConfigValue admin — searchable list of every parameter the engine resolves, with key, value, type, jurisdiction chip, and effective_from date." loading="lazy" width="1440" height="900"></a>
+        <a href="demo/v2/09-config.html"><img src="screenshots/v2/09-config.png" alt="ConfigValue admin — searchable list of every parameter the engine resolves, with key, value, type, jurisdiction chip, and effective_from date." loading="lazy" width="1440" height="900"></a>
         <figcaption>
           <span class="ribbon gold">SUBSTRATE · CONFIGURE WITHOUT DEPLOY</span>
           <span class="title">ConfigValue admin — /config</span>
@@ -518,7 +518,7 @@
       </figure>
 
       <figure class="shot">
-        <a href="screenshots/v2/10-config-approvals.png"><img src="screenshots/v2/10-config-approvals.png" alt="Approval queue — drafted ConfigValues awaiting dual approval, with author, citation, rationale, and approve / request-changes / reject actions." loading="lazy" width="1440" height="900"></a>
+        <a href="demo/v2/10-config-approvals.html"><img src="screenshots/v2/10-config-approvals.png" alt="Approval queue — drafted ConfigValues awaiting dual approval, with author, citation, rationale, and approve / request-changes / reject actions." loading="lazy" width="1440" height="900"></a>
         <figcaption>
           <span class="ribbon gold">GOVERNANCE · DUAL APPROVAL</span>
           <span class="title">Approval queue — /config/approvals</span>
@@ -527,7 +527,7 @@
       </figure>
 
       <figure class="shot">
-        <a href="screenshots/v2/04-authority.png"><img src="screenshots/v2/04-authority.png" alt="Authority chain browser — Constitution to Act to Regulation to Service decision, with citations and effective dates per layer." loading="lazy" width="1440" height="900"></a>
+        <a href="demo/v2/04-authority.html"><img src="screenshots/v2/04-authority.png" alt="Authority chain browser — Constitution to Act to Regulation to Service decision, with citations and effective dates per layer." loading="lazy" width="1440" height="900"></a>
         <figcaption>
           <span class="ribbon gold">TRACEABILITY · AUTHORITY CHAIN</span>
           <span class="title">Authority — /authority</span>
@@ -536,7 +536,7 @@
       </figure>
 
       <figure class="shot">
-        <a href="screenshots/v2/08-impact.png"><img src="screenshots/v2/08-impact.png" alt="Citation impact search — query 'OAS Act, s. 3(1)' returns every ConfigValue across every jurisdiction that references that citation." loading="lazy" width="1440" height="900"></a>
+        <a href="demo/v2/08-impact.html"><img src="screenshots/v2/08-impact.png" alt="Citation impact search — query 'OAS Act, s. 3(1)' returns every ConfigValue across every jurisdiction that references that citation." loading="lazy" width="1440" height="900"></a>
         <figcaption>
           <span class="ribbon">RESEARCH · IMPACT SEARCH</span>
           <span class="title">Citation impact — /impact</span>
@@ -545,7 +545,7 @@
       </figure>
 
       <figure class="shot">
-        <a href="screenshots/v2/12-admin-federation.png"><img src="screenshots/v2/12-admin-federation.png" alt="Federation registry — Ed25519-signed lawcode packs from peer publishers, with trust state, signed/unsigned chip, and per-pack actions." loading="lazy" width="1440" height="900"></a>
+        <a href="demo/v2/12-admin-federation.html"><img src="screenshots/v2/12-admin-federation.png" alt="Federation registry — Ed25519-signed lawcode packs from peer publishers, with trust state, signed/unsigned chip, and per-pack actions." loading="lazy" width="1440" height="900"></a>
         <figcaption>
           <span class="ribbon">FEDERATION · ED25519 SIGNED PACKS</span>
           <span class="title">Federation — /admin/federation</span>
@@ -554,7 +554,7 @@
       </figure>
 
       <figure class="shot">
-        <a href="screenshots/v2/13-encode.png"><img src="screenshots/v2/13-encode.png" alt="Encoding pipeline — paste statutory text, an LLM extracts candidate rules, a human reviews each proposal, accepted proposals commit as ConfigValue records." loading="lazy" width="1440" height="900"></a>
+        <a href="demo/v2/13-encode.html"><img src="screenshots/v2/13-encode.png" alt="Encoding pipeline — paste statutory text, an LLM extracts candidate rules, a human reviews each proposal, accepted proposals commit as ConfigValue records." loading="lazy" width="1440" height="900"></a>
         <figcaption>
           <span class="ribbon">PIPELINE · AI-ASSISTED, HUMAN-RATIFIED</span>
           <span class="title">Encoding — /encode</span>
@@ -563,7 +563,7 @@
       </figure>
 
       <figure class="shot">
-        <a href="screenshots/v2/14-screen-fr.png"><img src="screenshots/v2/14-screen-fr.png" alt="Self-screening for France — Retraite de base (CNAV), République française. Substrate-driven program text renders in French." loading="lazy" width="1440" height="900"></a>
+        <a href="demo/v2/14-screen-fr.html"><img src="screenshots/v2/14-screen-fr.png" alt="Self-screening for France — Retraite de base (CNAV), République française. Substrate-driven program text renders in French." loading="lazy" width="1440" height="900"></a>
         <figcaption>
           <span class="ribbon">MULTI-JURISDICTION · SAME PIPELINE</span>
           <span class="title">France — /screen/fr</span>
