@@ -55,7 +55,7 @@ Every value the system uses — thresholds, accepted statuses, evidence types, c
 | 4 | Prompt-as-config approval policy | Dual approval (domain expert + maintainer) | End of Phase 4 | **LOCKED** — ADR-008 |
 | 5 | **(added)** Lovable code repo location | Same repo, `web/` folder; Lovable authors upstream, artefact brought in | End of Phase 0 | **LOCKED** — ADR-005 |
 | 6 | **(added)** Backwards-compat strategy during Phase 1–2 | `resolve()` falls back to current Python constants until Phase 2 cuts each domain over; tests stay green throughout | End of Phase 1 | **LOCKED** — ADR-004 |
-| 7 | **(added)** Federation trust model (Phase 8) | Signed manifests + checksum pinning in `lawcode/REGISTRY.yaml`; reject unsigned by default | End of Phase 7 | OPEN |
+| 7 | **(added)** Federation trust model (Phase 8) | Signed manifests + checksum pinning in `lawcode/REGISTRY.yaml`; reject unsigned by default | End of Phase 7 | **LOCKED** — ADR-009 (Ed25519 signed packs + publisher allowlist; fail-closed on unsigned/checksum mismatch). Implemented in `src/govops/federation.py`; admin surface at `/api/admin/federation/*`. |
 
 Record gate decisions as ADRs in `docs/design/ADRs/`.
 
@@ -241,14 +241,15 @@ Sequenced; each sub-phase ships independently.
 | 3 | ~85 | ✅ | + YAML loader tests |
 | 4 | ~88 | ✅ | + prompt reproducibility tests |
 | 5 | ~90 | ✅ | + schema validation tests |
-| 6 | ~100 | 🟡 in progress | + admin endpoint tests; UI surfaces shipped, full E2E exit-line proof pending |
-| 7 | ~105 | 🟡 backend done | impact endpoint + 23 tests landed; Lovable surface tracked as `docs/govops-014-citation-impact.md` |
-| 8 | ~115 | ⬜ | + federation tests |
+| 6 | ~100 | ✅ | admin endpoint tests + Lovable admin/timeline/diff/draft/approvals/prompts surfaces shipped; admin-flow E2E proves substrate boundary |
+| 7 | ~105 | ✅ | impact endpoint + 23 tests landed; Lovable `/impact` shipped (govops-014/14a) |
+| 8 | ~115 | ✅ | federation pipeline + admin federation HTTP surface; signed packs with Ed25519 (ADR-009) |
 | 9 | ✅ docs only | ✅ | `docs/design/LAW-AS-CODE.md` published |
-| 10A | ~110 | 🟡 backend done | self-screening endpoint + 18 tests landed; Lovable surface tracked as `docs/govops-015-self-screening.md` |
-| 10B | ~120 | ⬜ | calculation rule type + engine.calculate() |
-| 10C | ~130 | ⬜ | notification artefact templating |
-| 10D | ~145 | ⬜ | life-event reassessment |
+| 10A | ~110 | ✅ | self-screening endpoint + 18 tests landed; Lovable `/screen` shipped (govops-015/15a/15b) |
+| 10B | ~120 | ✅ | `RuleType.CALCULATION` + typed-AST formulas + per-step citation; CA OAS calc wired through `screen`, `evaluate`, `audit` |
+| 10C | ~130 | ✅ | decision-notice rendering with template-as-ConfigValue + sha256 in audit; `POST /api/screen/notice` |
+| 10D | ~145 | ✅ | event-driven reassessment with supersession chain + `POST /api/cases/{id}/events` |
+| 11 | — | ✅ | scalar seam closed (ADR-013 addendum) — every parameter honours `evaluation_date` |
 
 **Live count (2026-04-28)**: 375 backend tests passing (`pytest -q`). Delta from 343 → 375 covers the v0.3.0 federation + admin work (343 → 366), the govops-022 backend prelude (366 → 373, +7 in `tests/test_api_jurisdiction_howto.py`), and the 7th-jurisdiction integration (373 → 375, +2 in `tests/test_api.py::TestMultiJurisdiction`).
 
