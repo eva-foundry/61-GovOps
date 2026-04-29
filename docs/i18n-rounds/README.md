@@ -41,4 +41,4 @@ After every round there will be substantive cells that look like copy-paste from
 - **Intentional loanwords** — e.g. `admin.federation.col.{actions,name,status,version}` — flagged in the round notes when accepted.
 - **Developer-only operator strings** — `home.eyebrow` reads `spec govops-002 · law-as-code` in every locale because it's a developer reference, not user-facing copy.
 
-Any "copy-paste" check should treat these as legitimate via an allowlist, not flag them as gaps.
+These are codified in [web/scripts/i18n-translation-allowlist.json](../../web/scripts/i18n-translation-allowlist.json) — `global_keys` for every-locale exceptions, `per_locale_keys[<loc>]` for locale-specific cognates / loanwords. The [check-i18n-translation.mjs](../../web/scripts/check-i18n-translation.mjs) gate runs in `prebuild` and fails the build if a substantive non-EN value matches EN without being on the allowlist. New copy-paste cases force a deliberate decision: translate or allowlist.
