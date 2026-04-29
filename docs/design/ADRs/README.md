@@ -33,6 +33,7 @@ Each ADR follows this structure:
 | 013 | [Event-driven reassessment with supersession chain](ADR-013-event-driven-reassessment.md) | Accepted | v2.0 / Phase 10D |
 | 014 | [Program-as-Primitive (manifest model)](ADR-014-program-as-primitive.md) | Accepted | v3.0 / Gate 1 |
 | 015 | [Canonical Program Shape Library](ADR-015-program-shape-library.md) | Accepted | v3.0 / Gate 2 |
+| 016 | [Engine refactor scope: OASEngine → ProgramEngine](ADR-016-engine-refactor-scope.md) | Accepted | v3.0 / Gate 3 |
 
 ## Contributing ADRs
 
