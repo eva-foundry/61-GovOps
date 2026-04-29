@@ -1,3 +1,22 @@
+---
+title: GovOps LaC — Law as Code
+emoji: ⚖️
+colorFrom: yellow
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+license: apache-2.0
+short_description: Law-as-Code reference implementation
+---
+
+<!--
+The block above is Hugging Face Spaces metadata. GitHub renders it as a
+YAML code-block at the top of the README. It only takes effect when the
+repo is pushed to a Space (huggingface.co/spaces/agentic-state/govops-lac).
+For GitHub-only readers, jump past it to the heading below.
+-->
+
 # GovOps - Policy-Driven Service Delivery Machine
 
 > **Disclaimer**: This is an independent open-source prototype. It is **not affiliated with, endorsed by, or representing any government, department, agency, or initiative — including SPRIND, the Agentic State paper authors (Ilves, Kilian, Parazzoli, Peixoto, Velsberg), or any of the seven jurisdictions used as illustrative case studies**. The `agentic-state` GitHub organization is an independent open-source implementation effort whose name signals framework alignment, **not authorship or endorsement** by the Agentic State paper authors. Legislative text used in the demo (including the Old Age Security Act) is publicly available law interpreted by the author for illustrative purposes only — it is **not authoritative operational guidance** and should not be relied upon for actual eligibility determinations.
