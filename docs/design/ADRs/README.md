@@ -34,6 +34,7 @@ Each ADR follows this structure:
 | 014 | [Program-as-Primitive (manifest model)](ADR-014-program-as-primitive.md) | Accepted | v3.0 / Gate 1 |
 | 015 | [Canonical Program Shape Library](ADR-015-program-shape-library.md) | Accepted | v3.0 / Gate 2 |
 | 016 | [Engine refactor scope: OASEngine → ProgramEngine](ADR-016-engine-refactor-scope.md) | Accepted | v3.0 / Gate 3 |
+| 017 | [Bounded-benefit rule primitives](ADR-017-bounded-benefit-rule-primitives.md) | Accepted | v3.0 / Gate 4 |
 
 ## Contributing ADRs
 
