@@ -37,7 +37,7 @@ For build history and accepted backlog: [`PLAN.md`](PLAN.md). For load-bearing d
 
 ```bash
 git clone https://github.com/agentic-state/GovOps-LaC.git
-cd 61-GovOps
+cd GovOps-LaC
 pip install -e ".[dev]"
 govops-demo                    # Jinja UI + JSON API at http://127.0.0.1:8000
 ```
@@ -294,7 +294,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-375 backend tests covering (all green on Python 3.10/3.11/3.12):
+396 backend tests covering (all green on Python 3.10/3.11/3.12):
 - Rule engine unit tests (all decision paths, edge cases, residency calculation)
 - Determinism verification (identical inputs = identical outputs)
 - Authority traceability (every rule has a statutory citation)

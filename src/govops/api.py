@@ -170,7 +170,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="GovOps",
     description="Policy-Driven Service Delivery Machine - Independent prototype using publicly available legislation as illustrative case studies.",
-    version="0.2.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -221,7 +221,7 @@ def health():
     return {
         "status": "healthy",
         "engine": "govops-demo",
-        "version": "0.2.0",
+        "version": "2.0.0",
         "jurisdiction": jur_code,
         "program": pack.program_name if pack else "",
         "available_jurisdictions": list(JURISDICTION_REGISTRY.keys()),

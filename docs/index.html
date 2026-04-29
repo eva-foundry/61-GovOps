@@ -426,7 +426,7 @@
     <div class="badges">
       <span class="badge">7 jurisdictions</span>
       <span class="badge">6 locales</span>
-      <span class="badge">375 backend tests</span>
+      <span class="badge">396 backend tests</span>
       <span class="badge">53 web tests</span>
       <span class="badge">Cross-browser E2E</span>
       <span class="badge">Apache 2.0</span>
@@ -590,7 +590,7 @@
           <li>Embedded SQLite for substrate persistence (<a href="https://github.com/agentic-state/GovOps-LaC/blob/main/docs/design/ADRs/ADR-010-sqlite-from-phase-6.md">ADR-010</a>)</li>
           <li>Schema-validated YAML in CI (<span class="mono">21 files · 564 records</span>)</li>
           <li>Ed25519 federation pipeline (<a href="https://github.com/agentic-state/GovOps-LaC/blob/main/docs/design/ADRs/ADR-009-federation-trust-model.md">ADR-009</a>)</li>
-          <li>375 tests on Python 3.10 / 3.11 / 3.12</li>
+          <li>396 tests on Python 3.10 / 3.11 / 3.12</li>
         </ul>
       </div>
       <div class="build-card">
@@ -713,10 +713,10 @@
     <p class="section-lede">Embedded SQLite, no cloud, no API keys. Backend serves a Jinja UI on port 8000; the modern TanStack web UI runs on port 8080.</p>
     <pre class="quickstart"><span class="comment"># Backend (Jinja UI + JSON API)</span>
 git clone <span class="url">https://github.com/agentic-state/GovOps-LaC.git</span>
-cd 61-GovOps
+cd GovOps-LaC
 pip install -e ".[dev]"
 govops-demo                    <span class="comment"># http://127.0.0.1:8000</span>
-pytest -q                      <span class="comment"># 375 tests</span>
+pytest -q                      <span class="comment"># 396 tests</span>
 
 <span class="comment"># Modern web UI (Vite + TanStack + shadcn — the surface most contributors should use)</span>
 cd web && npm install && npm run dev   <span class="comment"># http://localhost:8080</span>

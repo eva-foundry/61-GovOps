@@ -23,7 +23,7 @@ A jurisdiction in GovOps is a country (or sub-national authority) that publishes
 
 ```bash
 git clone https://github.com/agentic-state/GovOps-LaC.git
-cd 61-GovOps
+cd GovOps-LaC
 pip install -e ".[dev]"
 pytest -q                  # 375 tests should pass before you change anything
 ```
