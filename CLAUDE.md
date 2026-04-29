@@ -13,11 +13,11 @@ Built on **FKTE** (Fractal Knowledge Transformation Engine):
 
 ## Active Track
 
-**Program-as-Primitive v3.0** is in flight. Phase A (manifest substrate) and Phase B (engine generalization → `ProgramEngine` with shape dispatch) shipped on `main`; charter at [docs/IDEA-GovOps-v3.0-ProgramAsPrimitive.md](docs/IDEA-GovOps-v3.0-ProgramAsPrimitive.md), execution plan at [PLAN-v3.md](PLAN-v3.md). Phase C (EI shape + new rule primitives) is next. The v2.0 plan that set this up lives in [PLAN.md](PLAN.md); v2.1 (hosted demo) is queued. ADRs land in [docs/design/ADRs/](docs/design/ADRs/).
+**Program-as-Primitive v3.0** is in flight. Phases A (manifest substrate), B (engine generalization → `ProgramEngine` with shape dispatch), and C (EI canonical shape + bounded-benefit rule primitives) shipped on `main`; charter at [docs/IDEA-GovOps-v3.0-ProgramAsPrimitive.md](docs/IDEA-GovOps-v3.0-ProgramAsPrimitive.md), execution plan at [PLAN-v3.md](PLAN-v3.md). Phase D (EI rollout to 6 jurisdictions — JP excluded as architectural control) is next. The v2.0 plan lives in [PLAN.md](PLAN.md); v2.1 (hosted demo) is queued. ADRs land in [docs/design/ADRs/](docs/design/ADRs/).
 
 ## Current State
 
-7 jurisdictions (CA/BR/ES/FR/DE/UA/JP), 6 languages (en/fr/pt/es/de/uk), **423 backend tests passing**.
+7 jurisdictions (CA/BR/ES/FR/DE/UA/JP), 6 languages (en/fr/pt/es/de/uk), **480 backend tests passing**.
 
 **Backend (Python / FastAPI):**
 - Deterministic rule engine for pension eligibility (age, residency/contribution, legal status, evidence)
@@ -44,7 +44,7 @@ govops-demo                                    # http://127.0.0.1:8000
 govops-demo --reload                           # auto-reload for development
 govops-demo --port 9000                        # custom port
 
-pytest -q                                      # all 423 tests
+pytest -q                                      # all 480 tests
 pytest tests/test_engine.py -v                 # one file
 pytest tests/test_engine.py::test_name -v      # one test
 pytest -k "residency" -v                       # by keyword
@@ -166,6 +166,9 @@ The engine in `engine.py` dispatches on `RuleType` (defined in `models.py`):
 | `legal_status` | Citizenship / permanent residency check |
 | `evidence_required` | Required document presence |
 | `exclusion` | Disqualifying conditions |
+| `calculation` | Typed-AST formula for benefit amount (ADR-011) |
+| `benefit_duration_bounded` | Weeks of eligibility for time-bounded programs (ADR-017) |
+| `active_obligation` | Forward-looking conditions surfaced on the recommendation (ADR-017) |
 
 To add a new rule type: extend the `RuleType` enum in `models.py`, add the evaluation method in `engine.py`, add test coverage in `test_engine.py`. **Note**: `RuleType.CALCULATION` is the only addition planned during v2.0 (Phase 10B).
 
