@@ -9,7 +9,7 @@ Per [ADR-015](../../docs/design/ADRs/ADR-015-program-shape-library.md), a *progr
 | Shape | Status | Used by |
 | --- | --- | --- |
 | [`old_age_pension-v1.0.yaml`](old_age_pension-v1.0.yaml) | Active (Phase A) | `lawcode/<jur>/programs/oas.yaml` for CA, BR, ES, FR, DE, UA, JP |
-| [`unemployment_insurance-v1.0.yaml`](unemployment_insurance-v1.0.yaml) | Reserved (Phase C unlocks) | `lawcode/<jur>/programs/ei.yaml` for CA, BR, ES, FR, DE, UA (NOT JP — architectural control) |
+| [`unemployment_insurance-v1.0.yaml`](unemployment_insurance-v1.0.yaml) | Active (Phase C) | `lawcode/<jur>/programs/ei.yaml` for CA, BR, ES, FR, DE, UA (NOT JP — architectural control). Phase D authors the 6 manifests. |
 
 ## What a shape declares
 

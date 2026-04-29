@@ -47,7 +47,7 @@ from govops.models import (
 )
 from govops.programs import Program
 from govops.residency import home_residency_years_after_18
-from govops.shapes import ShapeEvaluator, get_shape
+from govops.shapes import EligibleDetails, ShapeEvaluator, get_shape
 
 
 # Module-level helpers re-exported from govops.residency for backwards-compat —
@@ -214,12 +214,23 @@ class ProgramEngine:
                 "outcome": ev.outcome.value,
             })
 
-        # --- Determine overall outcome (triage generic; eligible-branch shape-specific) ---
-        outcome, pension_type, partial_ratio, program_outcome_detail = self._determine_outcome(
-            evals, missing_evidence, flags, case,
-        )
+        # --- Determine overall outcome (triage generic) ---
+        outcome = self._determine_outcome(evals, flags)
 
-        explanation = self._build_explanation(outcome, evals, pension_type, partial_ratio, missing_evidence)
+        # --- Eligible-branch: delegate to shape evaluator (ADR-016, ADR-017) ---
+        if outcome == DecisionOutcome.ELIGIBLE:
+            details = self._shape.determine_eligible_details(
+                list(self.rules.values()),
+                case,
+                self.evaluation_date,
+                self._param,
+            )
+        else:
+            details = EligibleDetails()
+
+        explanation = self._build_explanation(
+            outcome, evals, details.pension_type, details.partial_ratio, missing_evidence,
+        )
 
         # Compute benefit amount for eligible cases via formula AST (ADR-011).
         # Failures during calculation don't invalidate eligibility — they
@@ -238,18 +249,20 @@ class ProgramEngine:
             outcome=outcome,
             rule_evaluations=evals,
             explanation=explanation,
-            pension_type=pension_type,
-            partial_ratio=partial_ratio,
+            pension_type=details.pension_type,
+            partial_ratio=details.partial_ratio,
             missing_evidence=missing_evidence,
             flags=flags,
             benefit_amount=benefit_amount,
             program_id=self._program_id,
-            program_outcome_detail=program_outcome_detail,
+            program_outcome_detail=dict(details.program_outcome_detail),
+            benefit_period=details.benefit_period,
+            active_obligations=list(details.active_obligations),
         )
 
         self._log("recommendation_produced", f"Outcome: {outcome.value}", {
             "outcome": outcome.value,
-            "pension_type": pension_type,
+            "pension_type": details.pension_type,
             "benefit_amount": benefit_amount.value if benefit_amount else None,
         })
 
@@ -278,6 +291,10 @@ class ProgramEngine:
             return self._eval_evidence(rule, case, missing_evidence)
         elif rule.rule_type == RuleType.CALCULATION:
             return self._eval_calculation(rule)
+        elif rule.rule_type == RuleType.BENEFIT_DURATION_BOUNDED:
+            return self._eval_benefit_duration_bounded(rule)
+        elif rule.rule_type == RuleType.ACTIVE_OBLIGATION:
+            return self._eval_active_obligation(rule)
         else:
             return RuleEvaluation(
                 rule_id=rule.id,
@@ -295,6 +312,35 @@ class ProgramEngine:
             citation=rule.citation,
             outcome=RuleOutcome.NOT_APPLICABLE,
             detail="Calculation rule — see benefit_amount on recommendation",
+        )
+
+    def _eval_benefit_duration_bounded(self, rule: LegalRule) -> RuleEvaluation:
+        """Bounded-duration rules don't gate eligibility (ADR-017).
+
+        The shape evaluator consumes them post-triage to populate the
+        Recommendation's ``benefit_period`` field.
+        """
+        return RuleEvaluation(
+            rule_id=rule.id,
+            rule_description=rule.description,
+            citation=rule.citation,
+            outcome=RuleOutcome.NOT_APPLICABLE,
+            detail="Benefit duration rule — see benefit_period on recommendation",
+        )
+
+    def _eval_active_obligation(self, rule: LegalRule) -> RuleEvaluation:
+        """Active-obligation rules don't gate eligibility (ADR-017).
+
+        Obligations are forward-looking declarations, not satisfaction
+        checks. The shape evaluator collects them into the Recommendation's
+        ``active_obligations`` list.
+        """
+        return RuleEvaluation(
+            rule_id=rule.id,
+            rule_description=rule.description,
+            citation=rule.citation,
+            outcome=RuleOutcome.NOT_APPLICABLE,
+            detail="Active obligation — see active_obligations on recommendation",
         )
 
     def _eval_age(self, rule: LegalRule, case: CaseBundle) -> RuleEvaluation:
@@ -445,36 +491,20 @@ class ProgramEngine:
     def _determine_outcome(
         self,
         evals: list[RuleEvaluation],
-        missing_evidence: list[str],
         flags: list[str],
-        case: CaseBundle,
-    ) -> tuple[DecisionOutcome, str, str | None, dict]:
-        """Triage is generic; the eligible-branch is delegated to the shape (ADR-016)."""
+    ) -> DecisionOutcome:
+        """Generic outcome triage. Eligible-branch details are computed by the
+        shape evaluator in ``evaluate()`` (per ADR-016 + ADR-017)."""
         has_not_satisfied = any(e.outcome == RuleOutcome.NOT_SATISFIED for e in evals)
         has_insufficient = any(e.outcome == RuleOutcome.INSUFFICIENT_EVIDENCE for e in evals)
 
         if flags:
-            return DecisionOutcome.ESCALATE, "", None, {}
-
+            return DecisionOutcome.ESCALATE
         if has_not_satisfied and not has_insufficient:
-            return DecisionOutcome.INELIGIBLE, "", None, {}
-
+            return DecisionOutcome.INELIGIBLE
         if has_insufficient:
-            return DecisionOutcome.INSUFFICIENT_EVIDENCE, "", None, {}
-
-        # All rules satisfied — delegate eligible-branch details to shape evaluator.
-        details = self._shape.determine_eligible_details(
-            list(self.rules.values()),
-            case,
-            self.evaluation_date,
-            self._param,
-        )
-        return (
-            DecisionOutcome.ELIGIBLE,
-            details.pension_type,
-            details.partial_ratio,
-            dict(details.program_outcome_detail),
-        )
+            return DecisionOutcome.INSUFFICIENT_EVIDENCE
+        return DecisionOutcome.ELIGIBLE
 
     # ------------------------------------------------------------------
     # Calculation (ADR-011) — engine generic, field map shape-specific

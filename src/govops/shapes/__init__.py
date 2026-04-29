@@ -21,7 +21,7 @@ from typing import Any, Callable, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
-from govops.models import CaseBundle, LegalRule
+from govops.models import ActiveObligation, BenefitPeriod, CaseBundle, LegalRule
 
 
 class EligibleDetails(BaseModel):
@@ -29,15 +29,16 @@ class EligibleDetails(BaseModel):
 
     Per ADR-016, when :class:`govops.engine.ProgramEngine` triages a case as
     eligible (all rules satisfied), it delegates to the shape evaluator to
-    produce these details. Top-level fields ``pension_type`` and
-    ``partial_ratio`` are kept for OAS-shape backward compatibility (web UI,
-    audit package, decision-notice templates index them by name);
-    ``program_outcome_detail`` is the forward-compatible storage location for
-    bounded-benefit and other shape-specific output.
+    produce these details. Top-level typed fields are kept for canonical
+    shapes (web UI, audit package, decision-notice templates index them by
+    name); ``program_outcome_detail`` is the forward-compatible storage
+    location for shape-specific output that doesn't merit a typed field.
     """
 
     pension_type: str = ""
     partial_ratio: Optional[str] = None
+    benefit_period: Optional[BenefitPeriod] = None  # ADR-017
+    active_obligations: list[ActiveObligation] = Field(default_factory=list)  # ADR-017
     program_outcome_detail: dict = Field(default_factory=dict)
 
 
@@ -111,5 +112,7 @@ def get_shape(shape_id: str) -> ShapeEvaluator:
 # SHAPE_REGISTRY are all defined before the evaluator module imports them.
 
 from govops.shapes.old_age_pension import OldAgePensionEvaluator  # noqa: E402
+from govops.shapes.unemployment_insurance import UnemploymentInsuranceEvaluator  # noqa: E402
 
 register_shape(OldAgePensionEvaluator())
+register_shape(UnemploymentInsuranceEvaluator())
