@@ -19,6 +19,19 @@ export default defineConfig({
         "agentic-state-govops-lac.hf.space",
         ".hf.space", // future-proof for any HF Space URL pattern
       ],
+      // Reverse-proxy /api/* to the FastAPI backend running on the same
+      // container at port 8000. Without this, vite would serve the SPA
+      // index.html for /api/* requests (its catch-all SPA fallback) and the
+      // browser would never reach the JSON API. Enabled in dev only — the
+      // Dockerfile is the only consumer that needs it (local dev uses two
+      // separate ports per CONTRIBUTING.md and doesn't go through this
+      // proxy).
+      proxy: {
+        "/api": {
+          target: "http://127.0.0.1:8000",
+          changeOrigin: true,
+        },
+      },
     },
   },
 });
