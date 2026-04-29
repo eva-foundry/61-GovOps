@@ -170,9 +170,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="GovOps",
     description="Policy-Driven Service Delivery Machine - Independent prototype using publicly available legislation as illustrative case studies.",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
+
+# v2.1 hosted-demo middleware stack. Order matters: rate-limit FIRST (cheapest
+# to evaluate, blocks abuse before we do any work), then demo-mode header.
+# Both are no-ops when their env vars are unset, so local dev sees no change.
+from govops.rate_limit import RateLimitMiddleware  # noqa: E402
+from govops.demo_mode import DemoModeMiddleware  # noqa: E402
+
+app.add_middleware(DemoModeMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 if STATIC_DIR.exists():
@@ -216,15 +225,73 @@ def _base_context(lang: str) -> dict:
 
 @app.get("/api/health")
 def health():
+    from govops.demo_mode import is_demo_mode
+    from govops.llm_proxy import configured_providers
+
     jur_code = _current_jur_code()
     pack = JURISDICTION_REGISTRY.get(jur_code)
     return {
         "status": "healthy",
         "engine": "govops-demo",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "jurisdiction": jur_code,
         "program": pack.program_name if pack else "",
         "available_jurisdictions": list(JURISDICTION_REGISTRY.keys()),
+        "demo_mode": is_demo_mode(),
+        "llm_providers": configured_providers(),
+    }
+
+
+# ---------------------------------------------------------------------------
+# v2.1 LLM proxy endpoint — used by the encoder UI on the hosted demo so
+# visitors don't need their own API key. Rate-limited per IP via
+# RateLimitMiddleware (default 5 req/min, 100 req/day).
+# ---------------------------------------------------------------------------
+
+
+class _ChatMessage(BaseModel):
+    role: str  # "system" | "user" | "assistant"
+    content: str
+
+
+class LLMChatRequest(BaseModel):
+    messages: list[_ChatMessage]
+    max_tokens: int = 1024
+    temperature: float = 0.2
+
+
+@app.post("/api/llm/chat")
+async def llm_chat(payload: LLMChatRequest):
+    """Proxy a chat-completion request through the configured provider chain.
+
+    Returns a minimal subset of the OpenAI Chat Completions response shape:
+        { provider, model, content, elapsed_ms }
+
+    503 when no provider is configured; 502 when every provider in the chain
+    fails. Rate-limited at the middleware layer.
+    """
+    from govops.llm_proxy import (
+        LLMConfigError,
+        LLMExhaustedError,
+        chat as proxy_chat,
+    )
+
+    try:
+        result = await proxy_chat(
+            messages=[m.model_dump() for m in payload.messages],
+            max_tokens=payload.max_tokens,
+            temperature=payload.temperature,
+        )
+    except LLMConfigError as exc:
+        raise HTTPException(503, f"LLM proxy not configured: {exc}") from exc
+    except LLMExhaustedError as exc:
+        raise HTTPException(502, f"All LLM providers failed: {exc}") from exc
+
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "content": result.content,
+        "elapsed_ms": result.elapsed_ms,
     }
 
 
