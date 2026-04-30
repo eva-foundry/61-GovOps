@@ -27,6 +27,7 @@ import { Route as ConfigPromptsRouteImport } from './routes/config.prompts'
 import { Route as ConfigDraftRouteImport } from './routes/config.draft'
 import { Route as ConfigDiffRouteImport } from './routes/config.diff'
 import { Route as ConfigApprovalsRouteImport } from './routes/config.approvals'
+import { Route as CompareProgramIdRouteImport } from './routes/compare.$programId'
 import { Route as CasesCaseIdRouteImport } from './routes/cases.$caseId'
 import { Route as AdminFederationRouteImport } from './routes/admin.federation'
 import { Route as ConfigApprovalsIdRouteImport } from './routes/config.approvals.$id'
@@ -123,6 +124,11 @@ const ConfigApprovalsRoute = ConfigApprovalsRouteImport.update({
   path: '/approvals',
   getParentRoute: () => ConfigRoute,
 } as any)
+const CompareProgramIdRoute = CompareProgramIdRouteImport.update({
+  id: '/compare/$programId',
+  path: '/compare/$programId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CasesCaseIdRoute = CasesCaseIdRouteImport.update({
   id: '/$caseId',
   path: '/$caseId',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/walkthrough': typeof WalkthroughRoute
   '/admin/federation': typeof AdminFederationRoute
   '/cases/$caseId': typeof CasesCaseIdRoute
+  '/compare/$programId': typeof CompareProgramIdRoute
   '/config/approvals': typeof ConfigApprovalsRouteWithChildren
   '/config/diff': typeof ConfigDiffRoute
   '/config/draft': typeof ConfigDraftRoute
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/walkthrough': typeof WalkthroughRoute
   '/admin/federation': typeof AdminFederationRoute
   '/cases/$caseId': typeof CasesCaseIdRoute
+  '/compare/$programId': typeof CompareProgramIdRoute
   '/config/approvals': typeof ConfigApprovalsRouteWithChildren
   '/config/diff': typeof ConfigDiffRoute
   '/config/draft': typeof ConfigDraftRoute
@@ -215,6 +223,7 @@ export interface FileRoutesById {
   '/walkthrough': typeof WalkthroughRoute
   '/admin/federation': typeof AdminFederationRoute
   '/cases/$caseId': typeof CasesCaseIdRoute
+  '/compare/$programId': typeof CompareProgramIdRoute
   '/config/approvals': typeof ConfigApprovalsRouteWithChildren
   '/config/diff': typeof ConfigDiffRoute
   '/config/draft': typeof ConfigDraftRoute
@@ -242,6 +251,7 @@ export interface FileRouteTypes {
     | '/walkthrough'
     | '/admin/federation'
     | '/cases/$caseId'
+    | '/compare/$programId'
     | '/config/approvals'
     | '/config/diff'
     | '/config/draft'
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
     | '/walkthrough'
     | '/admin/federation'
     | '/cases/$caseId'
+    | '/compare/$programId'
     | '/config/approvals'
     | '/config/diff'
     | '/config/draft'
@@ -292,6 +303,7 @@ export interface FileRouteTypes {
     | '/walkthrough'
     | '/admin/federation'
     | '/cases/$caseId'
+    | '/compare/$programId'
     | '/config/approvals'
     | '/config/diff'
     | '/config/draft'
@@ -316,6 +328,7 @@ export interface RootRouteChildren {
   PoliciesRoute: typeof PoliciesRoute
   ScreenRoute: typeof ScreenRouteWithChildren
   WalkthroughRoute: typeof WalkthroughRoute
+  CompareProgramIdRoute: typeof CompareProgramIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -445,6 +458,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/config/approvals'
       preLoaderRoute: typeof ConfigApprovalsRouteImport
       parentRoute: typeof ConfigRoute
+    }
+    '/compare/$programId': {
+      id: '/compare/$programId'
+      path: '/compare/$programId'
+      fullPath: '/compare/$programId'
+      preLoaderRoute: typeof CompareProgramIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/cases/$caseId': {
       id: '/cases/$caseId'
@@ -584,6 +604,7 @@ const rootRouteChildren: RootRouteChildren = {
   PoliciesRoute: PoliciesRoute,
   ScreenRoute: ScreenRouteWithChildren,
   WalkthroughRoute: WalkthroughRoute,
+  CompareProgramIdRoute: CompareProgramIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -456,6 +456,22 @@ export async function setFederationPackEnabled(
   });
 }
 
+// ---- Cross-jurisdiction program comparison (Phase F) -----------------------
+
+import type { CompareProgramResponse } from "./types";
+
+export async function compareProgram(
+  programId: string,
+  jurisdictions?: string[],
+): Promise<CompareProgramResponse> {
+  const qs = jurisdictions && jurisdictions.length > 0
+    ? `?jurisdictions=${encodeURIComponent(jurisdictions.join(","))}`
+    : "";
+  return fetcher<CompareProgramResponse>(
+    `/api/programs/${encodeURIComponent(programId)}/compare${qs}`,
+  );
+}
+
 // ---- Decision notices (govops-018) ----------------------------------------
 
 import type { ScreenRequest as NoticeScreenRequest } from "./types";

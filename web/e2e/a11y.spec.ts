@@ -24,6 +24,7 @@ const A11Y_ROUTES = [
   "/config/diff",
   "/config/prompts",
   "/admin",
+  "/compare/ei",
 ];
 
 const STRICT = process.env.E2E_A11Y_STRICT === "1";

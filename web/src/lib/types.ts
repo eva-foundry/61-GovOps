@@ -486,3 +486,45 @@ export interface GetEventsResponse {
   events: CaseEvent[];
   recommendations: Recommendation[];
 }
+
+// ── Cross-jurisdiction program comparison (Phase F) ─────────────────────────
+
+export interface CompareJurisdictionAvailable {
+  code: string;
+  label: string;
+  available: true;
+  name: Record<string, string>;
+  description: Record<string, string>;
+  shape: string;
+  authority_chain: AuthorityReference[];
+  rules: LegalRule[];
+}
+
+export interface CompareJurisdictionUnavailable {
+  code: string;
+  label: string;
+  available: false;
+  unavailable_reason: string;
+}
+
+export type CompareJurisdiction =
+  | CompareJurisdictionAvailable
+  | CompareJurisdictionUnavailable;
+
+export interface CompareRow {
+  rule_id: string;
+  rule_type: string;
+  citation_per_jurisdiction: Record<string, string>;
+  description_per_jurisdiction: Record<string, string>;
+  parameters: Record<string, Record<string, unknown>>;
+}
+
+export interface CompareProgramResponse {
+  program_id: string;
+  shape: string | null;
+  jurisdictions: CompareJurisdiction[];
+  comparison: {
+    rule_ids: string[];
+    rows: CompareRow[];
+  };
+}

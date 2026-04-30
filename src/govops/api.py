@@ -1378,6 +1378,237 @@ def impact_by_citation(
 
 
 # ---------------------------------------------------------------------------
+# Cross-jurisdiction program comparison (v3 / Phase F)
+# ---------------------------------------------------------------------------
+
+
+# Active jurisdictions in v3 scope, in display order. JP is included as the
+# architectural-control entry; whether it appears in any specific comparison
+# depends on the program (e.g. JP has no EI manifest by design).
+_COMPARE_DEFAULT_JURISDICTIONS = ["ca", "br", "es", "fr", "de", "ua", "jp"]
+
+# Charter-locked: JP is the architectural control. Symmetric extension is
+# opt-in for adopters; absent manifests for the JP/program pair are by design,
+# not by oversight.
+_JP_EXCLUSION_REASON = (
+    "Japan is the v3 architectural control. Symmetric extension to JP is "
+    "opt-in for adopters and requires explicit re-approval per the charter "
+    "(docs/IDEA-GovOps-v3.0-ProgramAsPrimitive.md, §'The proof')."
+)
+
+
+def _compare_jurisdiction_label(jur_code: str) -> str:
+    pack = JURISDICTION_REGISTRY.get(jur_code)
+    if pack is None:
+        return jur_code.upper()
+    return pack.jurisdiction.name
+
+
+@app.get("/api/programs/{program_id}/compare")
+def compare_program(
+    program_id: str,
+    jurisdictions: str = "",
+):
+    """Cross-jurisdiction comparison surface for a single program (Phase F).
+
+    Loads each jurisdiction's manifest at `lawcode/<code>/programs/{program_id}.yaml`
+    directly from disk — independent of which jurisdiction is currently
+    seeded into `store`, so a comparison call doesn't disrupt operator
+    state. Resolved parameter values come through the substrate (refs are
+    resolved at manifest load time per ADR-014).
+
+    Query parameters:
+      - `jurisdictions`: comma-separated jur codes (default: all 7).
+
+    Response shape:
+      ```
+      {
+        "program_id": "ei",
+        "shape": "unemployment_insurance" | None,
+        "jurisdictions": [
+          {
+            "code": "ca",
+            "label": "Government of Canada",
+            "available": true,
+            "name": {"en": ..., "fr": ...},
+            "description": {...},
+            "shape": "unemployment_insurance",
+            "authority_chain": [...],
+            "rules": [...]
+          },
+          {
+            "code": "jp",
+            "label": "Nihon-koku",
+            "available": false,
+            "unavailable_reason": "..."
+          },
+          ...
+        ],
+        "comparison": {
+          "rule_ids": [...],
+          "rows": [
+            {
+              "rule_id": "rule-ei-contribution",
+              "rule_type": "residency_minimum",
+              "citation_per_jurisdiction": {"ca": "...", ...},
+              "description_per_jurisdiction": {"ca": "...", ...},
+              "parameters": {
+                "min_years": {"ca": 1, "br": 1.5, ...}
+              }
+            },
+            ...
+          ]
+        }
+      }
+      ```
+    """
+    requested = [c.strip().lower() for c in jurisdictions.split(",") if c.strip()]
+    if not requested:
+        requested = list(_COMPARE_DEFAULT_JURISDICTIONS)
+
+    invalid = [c for c in requested if c not in _COMPARE_DEFAULT_JURISDICTIONS]
+    if invalid:
+        raise HTTPException(
+            400,
+            f"Unknown jurisdiction code(s): {invalid}. "
+            f"Allowed: {_COMPARE_DEFAULT_JURISDICTIONS}",
+        )
+
+    jur_slots: list[dict[str, Any]] = []
+    available_programs: dict[str, Program] = {}
+
+    for code in requested:
+        manifest_path = LAWCODE_DIR / code / "programs" / f"{program_id}.yaml"
+        label = _compare_jurisdiction_label(code)
+        if not manifest_path.exists():
+            unavailable_reason = (
+                _JP_EXCLUSION_REASON
+                if code == "jp"
+                else (
+                    f"No manifest at lawcode/{code}/programs/{program_id}.yaml. "
+                    f"Symmetric extension to {code.upper()} is not yet authored."
+                )
+            )
+            jur_slots.append(
+                {
+                    "code": code,
+                    "label": label,
+                    "available": False,
+                    "unavailable_reason": unavailable_reason,
+                }
+            )
+            continue
+        try:
+            program = load_program_manifest(manifest_path)
+        except Exception as exc:
+            jur_slots.append(
+                {
+                    "code": code,
+                    "label": label,
+                    "available": False,
+                    "unavailable_reason": (
+                        f"Manifest at lawcode/{code}/programs/{program_id}.yaml "
+                        f"could not be loaded: {exc}"
+                    ),
+                }
+            )
+            continue
+        available_programs[code] = program
+        jur_slots.append(
+            {
+                "code": code,
+                "label": label,
+                "available": True,
+                "name": dict(program.name),
+                "description": dict(program.description),
+                "shape": program.shape,
+                "authority_chain": list(program.authority_chain),
+                "rules": list(program.rules),
+            }
+        )
+
+    # Comparison rows: union of rule_ids across all available manifests, in
+    # the order they appear in the first available program (preserves
+    # author-intended rule ordering for the canonical jurisdiction).
+    rule_id_order: list[str] = []
+    seen: set[str] = set()
+    for code in requested:
+        program = available_programs.get(code)
+        if program is None:
+            continue
+        for rule in program.rules:
+            if rule.id not in seen:
+                seen.add(rule.id)
+                rule_id_order.append(rule.id)
+
+    rows: list[dict[str, Any]] = []
+    for rule_id in rule_id_order:
+        # Collect every (jur, rule) pairing for this rule_id
+        rule_per_jur: dict[str, LegalRule] = {}
+        for code, program in available_programs.items():
+            for rule in program.rules:
+                if rule.id == rule_id:
+                    rule_per_jur[code] = rule
+                    break
+        if not rule_per_jur:
+            continue
+        # Rule type — first one wins (manifests for the same shape use the
+        # same rule_type for the same rule_id by Phase D's symmetry contract).
+        first_rule = next(iter(rule_per_jur.values()))
+        rule_type = first_rule.rule_type.value
+        # Per-jurisdiction citations + descriptions (often the same words in
+        # the source jurisdiction's own language; the frontend renders them
+        # alongside the values for traceability).
+        citation_per_jurisdiction = {
+            code: rule.citation for code, rule in rule_per_jur.items()
+        }
+        description_per_jurisdiction = {
+            code: rule.description for code, rule in rule_per_jur.items()
+        }
+        # Parameters: union of keys across jurisdictions, then transpose.
+        param_keys: list[str] = []
+        param_seen: set[str] = set()
+        for rule in rule_per_jur.values():
+            for k in rule.parameters.keys():
+                if k not in param_seen:
+                    param_seen.add(k)
+                    param_keys.append(k)
+        parameters: dict[str, dict[str, Any]] = {}
+        for k in param_keys:
+            parameters[k] = {
+                code: rule.parameters.get(k)
+                for code, rule in rule_per_jur.items()
+                if k in rule.parameters
+            }
+        rows.append(
+            {
+                "rule_id": rule_id,
+                "rule_type": rule_type,
+                "citation_per_jurisdiction": citation_per_jurisdiction,
+                "description_per_jurisdiction": description_per_jurisdiction,
+                "parameters": parameters,
+            }
+        )
+
+    # Shape declared at the program level — the same shape is required across
+    # every available jurisdiction (Phase D's symmetry rule), so the first
+    # available program's shape is the canonical answer.
+    canonical_shape = next(
+        (p.shape for p in available_programs.values()), None
+    )
+
+    return {
+        "program_id": program_id,
+        "shape": canonical_shape,
+        "jurisdictions": jur_slots,
+        "comparison": {
+            "rule_ids": rule_id_order,
+            "rows": rows,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Self-screening API (Law-as-Code v2.0 Phase 10A)
 # ---------------------------------------------------------------------------
 
