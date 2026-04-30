@@ -255,7 +255,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="GovOps",
     description="Policy-Driven Service Delivery Machine - Independent prototype using publicly available legislation as illustrative case studies.",
-    version="2.1.0",
+    version="0.5.0",
     lifespan=lifespan,
 )
 
