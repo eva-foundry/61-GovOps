@@ -528,3 +528,82 @@ export interface CompareProgramResponse {
     rows: CompareRow[];
   };
 }
+
+// ── Multi-program citizen check (Phase G) ───────────────────────────────────
+
+export interface CheckEvidence {
+  dob: boolean;
+  residency: boolean;
+  job_loss: boolean;
+}
+
+export interface CheckResidencyPeriod {
+  country: string;
+  start_date: string;       // ISO date
+  end_date?: string | null; // ISO date, null/undefined = ongoing
+}
+
+export interface CheckRequest {
+  jurisdiction_id: string;
+  date_of_birth: string;      // ISO date
+  legal_status: "citizen" | "permanent_resident" | "other";
+  country_of_birth?: string | null;
+  residency_periods: CheckResidencyPeriod[];
+  evidence_present: CheckEvidence;
+  programs?: string[] | null;
+  evaluation_date?: string | null;
+}
+
+export interface CheckRuleResult {
+  rule_id: string;
+  description: string;
+  citation: string;
+  outcome: string;
+  detail: string;
+  effective_from?: string | null;
+}
+
+export interface CheckBenefitAmount {
+  value: number;
+  currency: string;
+  period: string;
+  formula_trace: Array<Record<string, unknown>>;
+  citations: string[];
+}
+
+export interface CheckBenefitPeriod {
+  start_date: string;       // ISO date
+  end_date: string;         // ISO date
+  weeks_total: number;
+  weeks_remaining: number;
+  citations: string[];
+}
+
+export interface CheckActiveObligation {
+  obligation_id: string;
+  description: string;
+  citation: string;
+  cadence?: string | null;
+}
+
+export interface CheckProgramResult {
+  program_id: string;
+  program_name: string;
+  shape: string;
+  outcome: string;
+  pension_type: string;
+  partial_ratio?: string | null;
+  rule_results: CheckRuleResult[];
+  missing_evidence: string[];
+  benefit_amount?: CheckBenefitAmount | null;
+  benefit_period?: CheckBenefitPeriod | null;
+  active_obligations: CheckActiveObligation[];
+}
+
+export interface CheckResponse {
+  jurisdiction_id: string;
+  jurisdiction_label: string;
+  evaluation_date: string;
+  programs: CheckProgramResult[];
+  disclaimer: string;
+}

@@ -48,9 +48,12 @@ from govops.models import (
 from govops.program_interactions import detect_program_interactions
 from govops.programs import Program, load_program_manifest
 from govops.screen import (
+    CheckRequest,
+    CheckResponse,
     ScreenRequest,
     ScreenResponse,
     UnknownJurisdiction,
+    run_check,
     run_screen,
 )
 from govops.store import DemoStore
@@ -1630,6 +1633,30 @@ def screen(req: ScreenRequest) -> ScreenResponse:
             f"Unknown jurisdiction '{exc.args[0]}'. "
             f"Known: {sorted(JURISDICTION_REGISTRY)}",
         ) from exc
+
+
+@app.post("/api/check", response_model=CheckResponse)
+def check(req: CheckRequest) -> CheckResponse:
+    """Multi-program citizen check (v3 Phase G — citizen entry surface).
+
+    Evaluates every program available for the jurisdiction (OAS + EI in
+    CA/BR/ES/FR/DE/UA, OAS only in JP) against the citizen's declared
+    facts and returns one result per program. Privacy posture is identical
+    to `POST /api/screen` — no case row, no audit entry, no PII echoed.
+
+    Optional `programs: [...]` body field restricts evaluation to a subset;
+    unknown program ids → 400.
+    """
+    try:
+        return run_check(req)
+    except UnknownJurisdiction as exc:
+        raise HTTPException(
+            404,
+            f"Unknown jurisdiction '{exc.args[0]}'. "
+            f"Known: {sorted(JURISDICTION_REGISTRY)}",
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.post("/api/screen/notice")

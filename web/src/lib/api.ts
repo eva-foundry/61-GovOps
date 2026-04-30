@@ -458,7 +458,7 @@ export async function setFederationPackEnabled(
 
 // ---- Cross-jurisdiction program comparison (Phase F) -----------------------
 
-import type { CompareProgramResponse } from "./types";
+import type { CheckRequest, CheckResponse, CompareProgramResponse } from "./types";
 
 export async function compareProgram(
   programId: string,
@@ -470,6 +470,15 @@ export async function compareProgram(
   return fetcher<CompareProgramResponse>(
     `/api/programs/${encodeURIComponent(programId)}/compare${qs}`,
   );
+}
+
+// ---- Multi-program citizen check (Phase G) ---------------------------------
+
+export async function runCheck(req: CheckRequest): Promise<CheckResponse> {
+  return fetcher<CheckResponse>("/api/check", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
 }
 
 // ---- Decision notices (govops-018) ----------------------------------------
