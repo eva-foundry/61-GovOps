@@ -2,14 +2,10 @@
 
 Deterministic evaluation of public-sector program eligibility rules.
 Originally shipped (v2) as ``OASEngine`` for old-age pension; v3 Phase B
-(per ADR-016) generalizes to ``ProgramEngine`` with shape-specific
-post-processing delegated to evaluators in :mod:`govops.shapes`.
-
-Backwards compatibility (one cycle, removed at v3.1 Phase I cutover):
-``OASEngine`` is preserved as a thin :class:`DeprecationWarning`-emitting
-subclass so v2 callers (api.py, screen.py, test_engine.py) keep working
-unchanged. Migration path: pass ``program=`` instead of ``rules=``, or
-import ``ProgramEngine`` directly.
+(per ADR-016) generalized to ``ProgramEngine`` with shape-specific
+post-processing delegated to evaluators in :mod:`govops.shapes`. Phase I
+(v0.5.0 release) dropped the deprecated ``OASEngine`` alias; all callers
+now use ``ProgramEngine`` directly.
 
 Reference statutory case study:
   Old Age Security Act, R.S.C. 1985, c. O-9 — federal monthly pension for
@@ -27,7 +23,6 @@ Four possible outcomes:
 
 from __future__ import annotations
 
-import warnings
 from datetime import date, datetime, timezone
 from typing import Any, Callable, Optional
 
@@ -631,32 +626,3 @@ class ProgramEngine:
                 parts.append(f"  - {m}")
 
         return "\n".join(parts)
-
-
-# ---------------------------------------------------------------------------
-# Backwards-compat alias (per ADR-016)
-# ---------------------------------------------------------------------------
-
-
-class OASEngine(ProgramEngine):
-    """Deprecated alias for :class:`ProgramEngine`.
-
-    Preserved through one v3 cycle so v2 callers (api.py, screen.py,
-    test_engine.py) keep working unchanged. Emits :class:`DeprecationWarning`
-    on construction. Scheduled for removal at v3 Phase I cutover (v0.5.0
-    release) per ADR-016 §"Deprecation".
-
-    Migration: ``OASEngine(rules=…)`` → ``ProgramEngine(rules=…)``, or
-    upgrade to ``ProgramEngine(program=…)`` once a Program object is in
-    scope.
-    """
-
-    def __init__(self, *args, **kwargs):
-        warnings.warn(
-            "OASEngine is a deprecated alias for ProgramEngine; migrate to "
-            "ProgramEngine before v3.1 (removal scheduled for Phase I cutover). "
-            "See ADR-016.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(*args, **kwargs)

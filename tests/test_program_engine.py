@@ -1,21 +1,21 @@
 """Tests for v3 Phase B engine generalization (per ADR-016).
 
-The Phase B exit gate is a three-constructor byte-identical regression:
-``ProgramEngine(program=ca_oas)``, ``ProgramEngine(rules=oas_rules)``, and
-``OASEngine(rules=oas_rules)`` (deprecated alias) must produce identical
-recommendations against every demo case in seed.py.
+Originally a three-constructor regression (``program=…``, ``rules=…``,
+and the deprecated ``OASEngine(rules=…)`` alias). Phase I cutover dropped
+the alias, so the regression is now two-constructor: ``ProgramEngine(program=…)``
+and ``ProgramEngine(rules=…)`` must produce identical recommendations
+against every demo case in seed.py.
 """
 
 from __future__ import annotations
 
-import warnings
 from datetime import date
 from pathlib import Path
 
 import pytest
 
 from govops import seed
-from govops.engine import OASEngine, ProgramEngine
+from govops.engine import ProgramEngine
 from govops.models import DecisionOutcome, RuleType
 from govops.programs import Program, load_program_manifest
 from govops.shapes import (
@@ -108,53 +108,46 @@ def demo_cases():
     return seed.make_demo_cases()
 
 
-def _evaluate_three_ways(case, program: Program):
-    """Run the same case through all three constructor shapes."""
+def _evaluate_two_ways(case, program: Program):
+    """Run the same case through both surviving constructor shapes."""
     rec_program, _ = ProgramEngine(program=program).evaluate(case)
     rec_rules, _ = ProgramEngine(rules=seed.OAS_RULES).evaluate(case)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", DeprecationWarning)
-        rec_legacy, _ = OASEngine(rules=seed.OAS_RULES).evaluate(case)
-    return rec_program, rec_rules, rec_legacy
+    return rec_program, rec_rules
 
 
-class TestThreeConstructorRegression:
-    """All three constructor paths must produce identical eligible-branch output."""
+class TestTwoConstructorRegression:
+    """Both constructor paths must produce identical eligible-branch output.
+
+    Phase I cutover removed the third path (deprecated `OASEngine` alias).
+    """
 
     @pytest.mark.parametrize("case_id", ["demo-case-001", "demo-case-002", "demo-case-003", "demo-case-004"])
     def test_outcome_matches_across_constructors(self, ca_oas_program, demo_cases, case_id):
         case = next(c for c in demo_cases if c.id == case_id)
-        rec_program, rec_rules, rec_legacy = _evaluate_three_ways(case, ca_oas_program)
-        # All three must agree on the substantive fields.
+        rec_program, rec_rules = _evaluate_two_ways(case, ca_oas_program)
         for field_name in ("outcome", "pension_type", "partial_ratio", "missing_evidence", "flags"):
-            assert getattr(rec_program, field_name) == getattr(rec_rules, field_name) == getattr(
-                rec_legacy, field_name
-            ), f"Mismatch on {field_name} for {case_id}"
+            assert getattr(rec_program, field_name) == getattr(rec_rules, field_name), (
+                f"Mismatch on {field_name} for {case_id}"
+            )
 
     @pytest.mark.parametrize("case_id", ["demo-case-001", "demo-case-003"])
     def test_benefit_amount_matches_across_constructors(self, ca_oas_program, demo_cases, case_id):
         case = next(c for c in demo_cases if c.id == case_id)
-        rec_program, rec_rules, rec_legacy = _evaluate_three_ways(case, ca_oas_program)
-        # Eligible cases have a BenefitAmount via the formula AST.
+        rec_program, rec_rules = _evaluate_two_ways(case, ca_oas_program)
         assert rec_program.benefit_amount is not None
         assert rec_rules.benefit_amount is not None
-        assert rec_legacy.benefit_amount is not None
-        assert rec_program.benefit_amount.value == rec_rules.benefit_amount.value == rec_legacy.benefit_amount.value
-        assert (
-            rec_program.benefit_amount.citations
-            == rec_rules.benefit_amount.citations
-            == rec_legacy.benefit_amount.citations
-        )
+        assert rec_program.benefit_amount.value == rec_rules.benefit_amount.value
+        assert rec_program.benefit_amount.citations == rec_rules.benefit_amount.citations
 
     def test_rule_evaluations_align(self, ca_oas_program, demo_cases):
         case = demo_cases[0]
-        rec_program, rec_rules, rec_legacy = _evaluate_three_ways(case, ca_oas_program)
-        # Rule evaluations come out in dict-iteration order — stable across runs
-        # and the same for all three constructors since they all wrap the same
+        rec_program, rec_rules = _evaluate_two_ways(case, ca_oas_program)
+        # Rule evaluations come out in dict-iteration order — stable across
+        # runs and the same for both constructors since they wrap the same
         # underlying rule list.
         assert [e.rule_id for e in rec_program.rule_evaluations] == [
             e.rule_id for e in rec_rules.rule_evaluations
-        ] == [e.rule_id for e in rec_legacy.rule_evaluations]
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -190,26 +183,22 @@ class TestRecommendationFields:
 
 
 # ---------------------------------------------------------------------------
-# OASEngine deprecation alias still works
+# OASEngine alias removal — Phase I cutover
 # ---------------------------------------------------------------------------
 
 
-class TestOASEngineDeprecationAlias:
-    def test_oasengine_emits_deprecation_warning(self):
-        with pytest.warns(DeprecationWarning, match="ProgramEngine"):
-            OASEngine(rules=seed.OAS_RULES)
+class TestOASEngineAliasRemoved:
+    """The deprecated `OASEngine` alias was removed at Phase I cutover.
+    This test pins the contract: any future re-introduction must be a
+    deliberate design choice, not a regression.
+    """
 
-    def test_oasengine_is_subclass_of_program_engine(self):
-        assert issubclass(OASEngine, ProgramEngine)
-
-    def test_oasengine_evaluate_works(self, demo_cases):
-        case = demo_cases[0]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            rec, audit = OASEngine(rules=seed.OAS_RULES).evaluate(case)
-        assert rec.outcome == DecisionOutcome.ELIGIBLE
-        assert rec.pension_type == "full"
-        assert audit  # audit trail populated
+    def test_oasengine_no_longer_importable_from_engine(self):
+        from govops import engine as engine_mod
+        assert not hasattr(engine_mod, "OASEngine"), (
+            "OASEngine alias was removed at Phase I cutover (per ADR-016). "
+            "If you're re-introducing it, write a new ADR first."
+        )
 
 
 # ---------------------------------------------------------------------------

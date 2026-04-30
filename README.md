@@ -124,33 +124,36 @@ docker compose up
 
 ## What the Demo Does
 
-The demo implements a complete **Old Age Security (OAS) initial eligibility determination** for Canada -- a real federal benefit program with real statutory rules.
+GovOps ships **two canonical programs across seven jurisdictions** as the working reference implementation. Each program is encoded from the country's own statutes (not literally Canada's law applied elsewhere) and shares a canonical _shape_ — `old_age_pension` for the lifetime monthly benefit, `unemployment_insurance` for the bounded-duration benefit. Switching jurisdictions in the demo swaps in that country's authority chain, citations, and demo cases.
 
-### The workflow:
-
-1. **View** a case -- see the applicant profile, evidence, and residency history
-2. **Evaluate** -- the rule engine checks each statutory condition deterministically
-3. **Review** -- approve, reject, escalate, or request more information (human-in-the-loop)
-4. **Audit** -- every rule evaluation traces back to its legal citation
-
-### Four demo cases cover all decision paths:
-
-| Case | Applicant | Expected Outcome |
+| Jurisdiction | Old-age pension | Employment insurance |
 | --- | --- | --- |
-| demo-case-001 | Margaret Chen | Eligible - Full pension (40/40) |
-| demo-case-002 | David Park | Ineligible - Under age 65 |
-| demo-case-003 | Amara Osei | Eligible - Partial pension (33/40) |
-| demo-case-004 | Jean-Pierre Tremblay | Insufficient evidence |
+| Canada | Old Age Security (OAS Act, R.S.C. 1985, c. O-9) | Employment Insurance (S.C. 1996, c. 23) |
+| Brazil | Aposentadoria por Idade (Lei 8.213/91) | Seguro-Desemprego (Lei nº 7.998/1990) |
+| Spain | Pensión de jubilación (TRLGSS) | Prestación por desempleo (TRLGSS) |
+| France | Retraite de base (CNAV) | Allocations chômage (Code du travail / UNÉDIC) |
+| Germany | Regelaltersrente (SGB VI) | Arbeitslosengeld I (SGB III) |
+| Ukraine | Пенсія за віком (Закон № 1058-IV) | Допомога по безробіттю (Закон № 1533-III) |
+| Japan | Kosei Nenkin Hoken | _(architectural control — see charter)_ |
 
-### Rules encoded from the Old Age Security Act:
+Japan's pension is fully encoded; its EI is **deliberately absent** as the v3 architectural control proving symmetric extension is a choice, not a requirement.
 
-| Rule | Citation | Logic |
-| --- | --- | --- |
-| Age threshold | OAS Act, s. 3(1) | `age >= 65` |
-| Minimum residency | OAS Act, s. 3(1) | `canadian_residency_after_18 >= 10 years` |
-| Pension calculation | OAS Act, s. 3(2) | `min(years, 40) / 40` |
-| Legal status | OAS Act, s. 3(1) | citizen or permanent resident |
-| Evidence of age | OAS Regulations, s. 21(1) | birth certificate required |
+### The workflow per case:
+
+1. **View** a case — applicant profile, evidence, residency / contribution history
+2. **Evaluate** — the rule engine checks each statutory condition deterministically against every program registered for the jurisdiction
+3. **Review** — approve, reject, escalate, or request more information (human-in-the-loop)
+4. **Audit** — every rule evaluation traces back to its legal citation; cross-program interactions surface as warnings
+
+### v3 surfaces
+
+| Surface | What it does |
+| --- | --- |
+| `/cases/<id>` | Officer view: per-case eligibility across every program in the jurisdiction |
+| `/compare/<program-id>` | Government-leader view: side-by-side parameter table across the active jurisdictions, citation per cell |
+| `/check` | Citizen entry: declare a few facts, see every program you may qualify for. No PII stored. |
+| `/check/life-event?event=job_loss` | Citizen reassessment: bounded-duration timeline + obligations |
+| `/admin/federation` | Operator view: signed lawcode packs from peer publishers |
 
 ---
 
@@ -364,7 +367,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-423 backend tests covering (all green on Python 3.10/3.11/3.12):
+640 backend tests covering (all green on Python 3.10/3.11/3.12):
 - Rule engine unit tests (all decision paths, edge cases, residency calculation)
 - Determinism verification (identical inputs = identical outputs)
 - Authority traceability (every rule has a statutory citation)
@@ -378,6 +381,10 @@ pytest -v
 - Event-driven reassessment (supersession chain, life-event replay)
 - Federation (Ed25519 signing, manifest verification, fail-closed pipeline)
 - Date-aware substrate resolution (scalar + formula `ref` honour `evaluation_date`)
+- v3: program-as-primitive manifest loader + ProgramEngine shape dispatch + bounded-benefit primitives
+- v3: cross-program evaluation API + ProgramInteractionWarning + Employment Insurance × 6 jurisdictions
+- v3: government-leader comparison surface + citizen entry + life-event reassessment
+- v3: `govops init <country>` scaffolder + plain-language sidecar generator
 
 Plus a Playwright + axe E2E suite under `web/e2e/` covering the citizen and operator surfaces.
 

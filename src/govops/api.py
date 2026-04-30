@@ -33,10 +33,11 @@ from govops.encoder import (
     extract_rules_manual,
     extract_rules_with_llm,
 )
-from govops.engine import OASEngine, ProgramEngine
+from govops.engine import ProgramEngine
 from govops.i18n import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, get_translator
 from govops.jurisdictions import JURISDICTION_REGISTRY
 from govops.models import (
+    AuditEntry,
     CaseEvent,
     DecisionOutcome,
     EventType,
@@ -140,6 +141,27 @@ def _register_jurisdiction_programs(jur_code: str, pack) -> None:
             # take the whole jurisdiction offline.
             continue
         store.register_program(program)
+        # Phase I: when the demo seed is on, also surface the program's
+        # demo cases in `/api/cases` so a visitor lands on a populated
+        # case list across both OAS and EI. Gated on GOVOPS_SEED_DEMO=1
+        # so the existing pre-v3 case-count test invariants
+        # (4 cases per jurisdiction in test_api.py) keep holding by
+        # default.
+        if os.environ.get("GOVOPS_SEED_DEMO") == "1":
+            for case in program.demo_cases:
+                if case.id in store.cases:
+                    continue  # idempotent — re-seed doesn't duplicate
+                store.cases[case.id] = case
+                store.audit_trails.setdefault(case.id, []).append(
+                    AuditEntry(
+                        event_type="case_created",
+                        actor="system:demo-seed",
+                        detail=(
+                            f"Demo case seeded: {case.applicant.legal_name} "
+                            f"(program={program.program_id})"
+                        ),
+                    )
+                )
 
 
 def _seed_demo_drafts():
@@ -492,7 +514,7 @@ def evaluate_case(case_id: str, body: EvaluateRequest | None = None):
     # is dead code for the demo but keeps the door open for direct DemoStore
     # usage in tests.
     if not store.programs:
-        engine = OASEngine(rules=list(store.rules.values()))
+        engine = ProgramEngine(rules=list(store.rules.values()))
         rec, audit = engine.evaluate(case)
         prior = store.recommendations.get(case_id)
         if prior is not None:
@@ -615,7 +637,7 @@ def post_case_event(case_id: str, body: CaseEventRequest, reevaluate: bool = Tru
         as_of = max(e.effective_date for e in events) if events else event.effective_date
         projected = replay_events(case, events, as_of=as_of)
 
-        engine = OASEngine(rules=list(store.rules.values()), evaluation_date=as_of)
+        engine = ProgramEngine(rules=list(store.rules.values()), evaluation_date=as_of)
         rec, audit = engine.evaluate(projected)
 
         prior = store.recommendations.get(case_id)
@@ -1791,7 +1813,7 @@ def ui_evaluate(request: Request, case_id: str):
     case = store.get_case(case_id)
     if not case:
         raise HTTPException(404)
-    engine = OASEngine(rules=list(store.rules.values()))
+    engine = ProgramEngine(rules=list(store.rules.values()))
     rec, audit = engine.evaluate(case)
     store.save_recommendation(rec, audit)
     return RedirectResponse(url=f"/cases/{case_id}?lang={lang}", status_code=303)

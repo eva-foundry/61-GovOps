@@ -31,7 +31,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from govops.engine import OASEngine, ProgramEngine
+from govops.engine import ProgramEngine
 from govops.jurisdictions import JURISDICTION_REGISTRY, JurisdictionPack
 from govops.models import (
     Applicant,
@@ -240,7 +240,7 @@ def render_screen_notice_html(
     # look stable. Privacy invariant: the id has no persistence behind it.
     transient_case.id = "transient-screen-render"
 
-    engine = OASEngine(rules=list(pack.rules), evaluation_date=eval_date)
+    engine = ProgramEngine(rules=list(pack.rules), evaluation_date=eval_date)
     recommendation, _audit_entries = engine.evaluate(transient_case)
 
     # Map the screen-side prefix (`ca`, `br`, …) to the template slug
@@ -294,7 +294,7 @@ def run_screen(
         evidence_items=_evidence_items_from_request(req),
     )
 
-    engine = OASEngine(rules=list(pack.rules), evaluation_date=eval_date)
+    engine = ProgramEngine(rules=list(pack.rules), evaluation_date=eval_date)
     recommendation, _audit_entries = engine.evaluate(transient_case)
     # `_audit_entries` is intentionally discarded — citizen screening never
     # writes to an audit trail.
