@@ -13,11 +13,11 @@ Built on **FKTE** (Fractal Knowledge Transformation Engine):
 
 ## Active Track
 
-**Program-as-Primitive v3.0** is in flight. Phases A (manifest substrate), B (engine generalization → `ProgramEngine` with shape dispatch), C (EI canonical shape + bounded-benefit rule primitives), and D (EI rollout to 6 jurisdictions — JP excluded as architectural control) shipped on `main`. Charter: [docs/IDEA-GovOps-v3.0-ProgramAsPrimitive.md](docs/IDEA-GovOps-v3.0-ProgramAsPrimitive.md). Plan: [PLAN-v3.md](PLAN-v3.md). Phase E (cross-program evaluation API — one POST returns per-program slots for OAS + EI) is next. The v2.0 plan lives in [PLAN.md](PLAN.md); v2.1 (hosted demo) is queued. ADRs land in [docs/design/ADRs/](docs/design/ADRs/).
+**Program-as-Primitive v3.0** is in flight. Phases A (manifest substrate), B (engine generalization → `ProgramEngine` with shape dispatch), C (EI canonical shape + bounded-benefit rule primitives), D (EI rollout to 6 jurisdictions — JP excluded as architectural control), and E (cross-program evaluation API — one POST returns per-program slots for OAS + EI, with interaction warnings) shipped on `main`. Charter: [docs/IDEA-GovOps-v3.0-ProgramAsPrimitive.md](docs/IDEA-GovOps-v3.0-ProgramAsPrimitive.md). Plan: [PLAN-v3.md](PLAN-v3.md). Phase F (government-leader comparison surface) is next. The v2.0 plan lives in [PLAN.md](PLAN.md); v2.1 (hosted demo) is queued. ADRs land in [docs/design/ADRs/](docs/design/ADRs/).
 
 ## Current State
 
-7 jurisdictions (CA/BR/ES/FR/DE/UA/JP), 6 languages (en/fr/pt/es/de/uk), **561 backend tests passing**. Two programs canonicalized: Old Age Security (all 7 jurisdictions) and Employment Insurance (6 jurisdictions — JP excluded as v3 architectural control).
+7 jurisdictions (CA/BR/ES/FR/DE/UA/JP), 6 languages (en/fr/pt/es/de/uk), **579 backend tests passing**. Two programs canonicalized: Old Age Security (all 7 jurisdictions) and Employment Insurance (6 jurisdictions — JP excluded as v3 architectural control). Cross-program evaluation API live: `POST /api/cases/{id}/evaluate` accepts an optional `programs: [...]` body and returns `program_evaluations` + interaction `warnings` per ADR-018; pre-v3 callers keep the same `recommendation` (singular) shape.
 
 **Backend (Python / FastAPI):**
 - Deterministic rule engine for pension eligibility (age, residency/contribution, legal status, evidence)
@@ -101,6 +101,7 @@ Other workflows: `codeql.yml` (code scanning), `gitleaks.yml` (secret scanning, 
 | Residency math (extracted Phase B) | `src/govops/residency.py` |
 | Program manifest loader (v3, ADR-014) | `src/govops/programs.py` |
 | Shape evaluators (v3, ADR-015) | `src/govops/shapes/` |
+| Cross-program interaction registry (v3, ADR-018) | `src/govops/program_interactions.py` |
 | Canadian seed data | `src/govops/seed.py` |
 | Other jurisdictions | `src/govops/jurisdictions.py` |
 | Translations | `src/govops/i18n.py` |

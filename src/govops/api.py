@@ -33,7 +33,7 @@ from govops.encoder import (
     extract_rules_manual,
     extract_rules_with_llm,
 )
-from govops.engine import OASEngine
+from govops.engine import OASEngine, ProgramEngine
 from govops.i18n import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES, get_translator
 from govops.jurisdictions import JURISDICTION_REGISTRY
 from govops.models import (
@@ -41,8 +41,12 @@ from govops.models import (
     DecisionOutcome,
     EventType,
     HumanReviewAction,
+    ProgramInteractionWarning,
+    Recommendation,
     ReviewAction,
 )
+from govops.program_interactions import detect_program_interactions
+from govops.programs import Program, load_program_manifest
 from govops.screen import (
     ScreenRequest,
     ScreenResponse,
@@ -82,6 +86,57 @@ def _seed_jurisdiction(jur_code: str):
         rules=pack.rules,
         cases=pack.make_cases(),
     )
+    # v3 / ADR-018 — register every program available for this jurisdiction so
+    # the cross-program /evaluate endpoint sees them. The legacy OAS-shaped
+    # rules just seeded above become the canonical OAS Program; any other
+    # programs declared as manifests under `lawcode/<jur>/programs/*.yaml`
+    # are loaded directly. JP has no EI manifest by design (charter §"The
+    # proof") — registration silently skips it.
+    _register_jurisdiction_programs(jur_code, pack)
+
+
+def _register_jurisdiction_programs(jur_code: str, pack) -> None:
+    """Populate `store.programs` for the freshly-seeded jurisdiction.
+
+    OAS is synthesised from the rules `seed.py`/`jurisdictions.py` already
+    pushed into `store`, preserving byte-identical evaluation for the 30+
+    pre-v3 callers that POST `/api/cases/{id}/evaluate` with no body. Every
+    other manifest under `lawcode/<jur_code>/programs/` is loaded via
+    `load_program_manifest` so EI, when present, attaches automatically.
+    """
+    oas_program = Program(
+        program_id="oas",
+        jurisdiction_id=pack.jurisdiction.id,
+        shape="old_age_pension",
+        status="active",
+        name={"en": pack.program_name},
+        rules=list(store.rules.values()),
+        authority_chain=list(store.authority_chain),
+        legal_documents=list(store.legal_documents.values()),
+        demo_cases=list(store.cases.values()),
+    )
+    store.register_program(oas_program)
+
+    programs_dir = LAWCODE_DIR / jur_code / "programs"
+    if not programs_dir.exists():
+        return
+    for manifest_path in sorted(programs_dir.glob("*.yaml")):
+        if manifest_path.name.startswith("_"):
+            continue
+        if manifest_path.stem == "oas":
+            # OAS is already covered by the synthesised Program above —
+            # the manifest version (only present for CA today) would
+            # duplicate the rule set under a different LegalRule.id and
+            # break the back-compat path's byte-identical guarantee.
+            continue
+        try:
+            program = load_program_manifest(manifest_path)
+        except Exception:
+            # Manifest loading failures are surfaced by the schema-validation
+            # CI job; the API stays best-effort so a malformed file doesn't
+            # take the whole jurisdiction offline.
+            continue
+        store.register_program(program)
 
 
 def _seed_demo_drafts():
@@ -403,19 +458,101 @@ def get_case(case_id: str):
     }
 
 
+class EvaluateRequest(BaseModel):
+    """Optional cross-program selector for the evaluate endpoint (ADR-018).
+
+    `programs` lists the program ids to run. Omit (or send empty) to run
+    every program registered for the case's jurisdiction. Unknown ids
+    return HTTP 400.
+    """
+    programs: list[str] | None = None
+
+
 @app.post("/api/cases/{case_id}/evaluate")
-def evaluate_case(case_id: str):
+def evaluate_case(case_id: str, body: EvaluateRequest | None = None):
+    """Run the rule engine against the case (ADR-018 — cross-program).
+
+    Backward compatible: callers that POST with no body keep getting the
+    same `{"recommendation": ...}` shape they did pre-v3. v3 callers also
+    receive `program_evaluations` (one Recommendation per program) and
+    `warnings` (cross-program interaction notes).
+    """
     case = store.get_case(case_id)
     if not case:
         raise HTTPException(404, f"Case {case_id} not found")
-    engine = OASEngine(rules=list(store.rules.values()))
-    rec, audit = engine.evaluate(case)
-    # Link to the prior recommendation if any (ADR-013 supersession chain).
-    prior = store.recommendations.get(case_id)
-    if prior is not None:
-        rec.supersedes = prior.id
-    store.save_recommendation(rec, audit)
-    return {"recommendation": rec}
+
+    requested = list(body.programs) if (body and body.programs) else None
+
+    # Legacy fallback: when no programs are registered (ad-hoc test fixtures
+    # that bypass `_seed_jurisdiction`), preserve the v2 single-engine path
+    # exactly. v3 deployments register programs at seed time, so this branch
+    # is dead code for the demo but keeps the door open for direct DemoStore
+    # usage in tests.
+    if not store.programs:
+        engine = OASEngine(rules=list(store.rules.values()))
+        rec, audit = engine.evaluate(case)
+        prior = store.recommendations.get(case_id)
+        if prior is not None:
+            rec.supersedes = prior.id
+        store.save_recommendation(rec, audit)
+        store.program_warnings[case_id] = []
+        return {
+            "recommendation": rec,
+            "program_evaluations": [rec],
+            "warnings": [],
+        }
+
+    if requested is None:
+        program_ids = list(store.programs.keys())
+    else:
+        unknown = [p for p in requested if p not in store.programs]
+        if unknown:
+            raise HTTPException(
+                400,
+                f"Unknown program(s) for this jurisdiction: {unknown}. "
+                f"Available: {list(store.programs.keys())}",
+            )
+        program_ids = list(requested)
+
+    # Decide which program is the back-compat *primary* BEFORE running, so
+    # only its rec writes through `save_recommendation` (which updates the
+    # singular `recommendations[case_id]` and the flat
+    # `recommendation_history[case_id]` chain that ADR-013 supersession +
+    # legacy audit/notice consumers walk). Others go to the per-program
+    # index via `save_secondary_program_recommendation`. OAS wins when
+    # present so v2 callers keep reading the OAS rec from the back-compat
+    # surfaces; otherwise the first selected program is primary.
+    primary_id = "oas" if "oas" in program_ids else program_ids[0]
+
+    evaluations: list[Recommendation] = []
+    for pid in program_ids:
+        program = store.programs[pid]
+        engine = ProgramEngine(program=program)
+        rec, audit = engine.evaluate(case)
+        prior = store.program_recommendations.get(case_id, {}).get(pid)
+        if prior is not None:
+            rec.supersedes = prior.id
+        if pid == primary_id:
+            store.save_recommendation(rec, audit)
+        else:
+            store.save_secondary_program_recommendation(rec, audit)
+        evaluations.append(rec)
+
+    warnings = detect_program_interactions(evaluations, case.jurisdiction_id)
+    store.program_warnings[case_id] = warnings
+
+    # Back-compat alias: the singular `recommendation` field returns the
+    # OAS recommendation when present, otherwise the first evaluation.
+    primary = next(
+        (r for r in evaluations if r.program_id == "oas"),
+        evaluations[0],
+    )
+
+    return {
+        "recommendation": primary,
+        "program_evaluations": evaluations,
+        "warnings": warnings,
+    }
 
 
 # ---------------------------------------------------------------------------

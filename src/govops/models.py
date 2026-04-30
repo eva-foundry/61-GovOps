@@ -326,6 +326,27 @@ class AuditEntry(BaseModel):
     data: dict = {}
 
 
+# ---------------------------------------------------------------------------
+# Cross-program interactions (v3 / ADR-018 / Phase E)
+# ---------------------------------------------------------------------------
+
+class ProgramInteractionWarning(BaseModel):
+    """Interaction signal emitted when two or more programs run against the
+    same case produce results that warrant joint attention.
+
+    Severity is informational by default — adopters of the substrate can
+    author richer rules (offsets, asset tests, family-unit interactions) at
+    v4 without changing the engine. Phase E ships exactly one rule:
+    OAS + EI dual eligibility surfaces an `info` warning so cross-program
+    consumers can render both programs side by side.
+    """
+    id: str = Field(default_factory=_new_id)
+    severity: str = "info"           # "info" | "warning" | "conflict"
+    programs: list[str] = Field(default_factory=list)   # program_ids involved
+    description: str = ""
+    citation: str = ""
+
+
 class AuditPackage(BaseModel):
     case_id: str
     generated_at: datetime = Field(default_factory=_utcnow)
@@ -337,3 +358,10 @@ class AuditPackage(BaseModel):
     audit_trail: list[AuditEntry] = []
     rules_applied: list[RuleEvaluation] = []
     evidence_summary: list[dict] = []
+    # v3 / ADR-018 — per-program slots. `recommendation` (singular) stays as
+    # the back-compat alias for v2 audit consumers; v3 consumers read
+    # `program_evaluations`. Both are populated when more than one program
+    # ran against the case; older single-program flows leave
+    # `program_evaluations` empty.
+    program_evaluations: list[Recommendation] = Field(default_factory=list)
+    program_warnings: list[ProgramInteractionWarning] = Field(default_factory=list)
