@@ -57,6 +57,11 @@ RUN mkdir -p /data
 ENV GOVOPS_DB_PATH=/data/govops.db
 ENV GOVOPS_DEMO_MODE=1
 ENV GOVOPS_SEED_DEMO=1
+# Disable vite HMR in the hosted demo. HF Spaces' reverse proxy closes idle
+# websockets after ~30s; with HMR enabled, vite's client tries to reconnect
+# and the page falls into a broken mid-session state ("time-based crash").
+# HMR has no value in a deployed demo. Local dev (env unset) keeps HMR.
+ENV VITE_DISABLE_HMR=1
 # HF Spaces requires the public process to listen on 0.0.0.0:7860
 ENV PORT=7860
 EXPOSE 7860
@@ -68,8 +73,8 @@ RUN printf '#!/bin/bash\n\
 set -e\n\
 echo "[demo] booting GovOps v2.1 — uvicorn + vite dev"\n\
 \n\
-# 1. Backend on internal port 8000\n\
-uvicorn govops.api:app --host 127.0.0.1 --port 8000 --log-level warning &\n\
+# 1. Backend on internal port 8000 (info level so request lines reach HF logs)\n\
+uvicorn govops.api:app --host 127.0.0.1 --port 8000 --log-level info &\n\
 UVICORN_PID=$!\n\
 \n\
 # 2. Wait for backend health (up to 30s) before starting the frontend.\n\
@@ -88,10 +93,12 @@ cd /app/web && \\\n\
   npm run dev -- --host 0.0.0.0 --port 7860 --strictPort &\n\
 VITE_PID=$!\n\
 \n\
-# 4. Wait for either process; exit when either dies (HF auto-restarts).\n\
+# 4. Wait for either process; identify WHICH one died so HF container logs\n\
+#    tell us if recurring deaths are uvicorn or vite (different fix paths).\n\
 wait -n "$UVICORN_PID" "$VITE_PID"\n\
 EXIT_CODE=$?\n\
-echo "[demo] one process exited with code $EXIT_CODE - terminating container"\n\
+if ! kill -0 "$UVICORN_PID" 2>/dev/null; then DIED=uvicorn; else DIED=vite; fi\n\
+echo "[demo] $DIED died (exit=$EXIT_CODE) at $(date -u +%FT%TZ) - container will restart"\n\
 kill "$UVICORN_PID" "$VITE_PID" 2>/dev/null || true\n\
 exit "$EXIT_CODE"\n' > /app/start.sh \
   && chmod +x /app/start.sh

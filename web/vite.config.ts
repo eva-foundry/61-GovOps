@@ -12,6 +12,15 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 // vite refuses requests with a Host header that doesn't match its known list
 // and returns 403 to anyone hitting the HF Space URL. Local dev is unaffected
 // (localhost is always allowed).
+//
+// `hmr: false` (gated on VITE_DISABLE_HMR=1, set in the Dockerfile) is the
+// fix for the v2.1 hosted-demo "time-based crash": HF Spaces' reverse proxy
+// closes idle websockets after ~30s, vite's client tries to reconnect, and
+// the page can end up in a broken mid-session state. HMR has zero value in a
+// deployed demo — disabling it removes the failure surface entirely. Local
+// dev keeps HMR (env unset → undefined → vite default behaviour).
+const disableHmr = process.env.VITE_DISABLE_HMR === "1";
+
 export default defineConfig({
   vite: {
     server: {
@@ -19,6 +28,7 @@ export default defineConfig({
         "agentic-state-govops-lac.hf.space",
         ".hf.space", // future-proof for any HF Space URL pattern
       ],
+      hmr: disableHmr ? false : undefined,
       // Reverse-proxy /api/* to the FastAPI backend running on the same
       // container at port 8000. Without this, vite would serve the SPA
       // index.html for /api/* requests (its catch-all SPA fallback) and the
