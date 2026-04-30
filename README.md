@@ -80,6 +80,48 @@ No database server, no cloud, no API keys. Embedded SQLite handles the substrate
 
 ---
 
+## Add your country in 5 minutes (v3 — adoption substrate)
+
+GovOps v3 is built around the idea that adding a jurisdiction should be the same shape as forking a Unix tool: a single command produces a complete skeleton, every value is a TODO marker pointing at the law that fills it, and the test suite tells you when you're done.
+
+### One command, schema-valid skeleton
+
+```bash
+pip install -e ".[dev]"
+govops init pl --shapes oas,ei
+```
+
+This writes:
+
+```
+lawcode/pl/
+├── jurisdiction.yaml
+├── programs/
+│   ├── oas.yaml          # program manifest (ADR-014)
+│   ├── oas.md            # plain-language sidecar for non-coder review
+│   ├── ei.yaml
+│   └── ei.md
+└── config/
+    ├── oas-rules.yaml    # substrate values (per-parameter, dated)
+    └── ei-rules.yaml
+```
+
+Every TODO marker in those files is a hand-fill point. The skeleton is schema-valid the moment it lands — `pytest` confirms the structure before you touch a single citation. The plain-language sidecars (`*.md`) are generated alongside the YAML so a non-coder program leader can review the encoded rules without reading YAML; regenerate them at any time with `govops docs lawcode/pl/programs/oas.yaml`.
+
+### Zero-toolchain run via `docker compose`
+
+Don't have Python or Node installed?
+
+```bash
+docker compose up
+```
+
+…brings up the same two-process demo (FastAPI on `:8000`, TanStack UI on `:8080`) on any machine with Docker. Editing `lawcode/<jur>/` on the host hot-reloads inside the container — the contribution loop opens up to anyone who can read law and edit text.
+
+> The `docker-compose.yml` at the repo root and the two images under `docker/` are distinct from the top-level `Dockerfile` (which is the v2.1 hosted-demo single-container image). Use either independently.
+
+---
+
 ## What the Demo Does
 
 The demo implements a complete **Old Age Security (OAS) initial eligibility determination** for Canada -- a real federal benefit program with real statutory rules.
