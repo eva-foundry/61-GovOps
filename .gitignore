@@ -36,6 +36,9 @@ ENV/
 .claude/sessions/
 .claude/scheduled_tasks.lock
 
+# Claude Code memory event log (workspace log-event.sh hook writes here)
+.claude-events/
+
 # i18n translation work-in-progress exports (round-tripped via CSV)
 i18n-export-*.csv
 i18n-import-*.csv
