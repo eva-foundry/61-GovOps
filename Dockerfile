@@ -64,7 +64,8 @@ COPY web/ ./
 # hit the FastAPI process inside the same uvicorn container directly.
 RUN VITE_API_BASE_URL="" node scripts/clean-route-tree.mjs \
  && VITE_API_BASE_URL="" npx vite build \
- && node scripts/check-route-tree-duplicates.mjs
+ && node scripts/check-route-tree-duplicates.mjs \
+ && node scripts/check-bundle-no-localhost.mjs
 
 # ============================================================================
 # Stage 2: Python runtime — single uvicorn process
